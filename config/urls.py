@@ -20,6 +20,7 @@ urlpatterns = [
     # API Endpoints
     path('api/', include('apps.usuarios.urls', namespace='usuarios')),
     path('api/inventario/', include('apps.inventario.urls', namespace='inventario')),
+    path('api/ventas/', include('apps.ventas.urls', namespace='ventas')),
 
 ]
 
