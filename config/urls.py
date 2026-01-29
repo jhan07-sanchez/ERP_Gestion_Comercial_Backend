@@ -19,6 +19,8 @@ urlpatterns = [
 
     # API Endpoints
     path('api/', include('apps.usuarios.urls', namespace='usuarios')),
+    path('api/inventario/', include('apps.inventario.urls', namespace='inventario')),
+
 ]
 
 # Servir archivos media en desarrollo
