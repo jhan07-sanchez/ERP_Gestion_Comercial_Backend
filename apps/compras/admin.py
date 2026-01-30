@@ -30,8 +30,12 @@ class CompraAdmin(admin.ModelAdmin):
     )
     
     def total_formateado(self, obj):
-        return format_html('<span style="color: blue; font-weight: bold;">${:,.2f}</span>', obj.total)
-    total_formateado.short_description = 'Total'
+      total = float(obj.total)
+      return format_html(
+        '<span style="color: blue; font-weight: bold;">${}</span>',
+        f'{total:,.2f}'
+    )
+
     
     def save_model(self, request, obj, form, change):
         if not change:  # Si es una nueva compra
@@ -47,5 +51,8 @@ class DetalleCompraAdmin(admin.ModelAdmin):
     readonly_fields = ('subtotal',)
     
     def subtotal_formateado(self, obj):
-        return format_html('<span style="color: blue; font-weight: bold;">${:,.2f}</span>', obj.subtotal)
-    subtotal_formateado.short_description = 'Subtotal'
+       subtotal = float(obj.subtotal)
+       return format_html(
+        '<span style="color: blue; font-weight: bold;">${}</span>',
+        f'{subtotal:,.2f}'
+    )

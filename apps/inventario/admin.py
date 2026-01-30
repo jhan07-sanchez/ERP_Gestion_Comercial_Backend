@@ -75,8 +75,8 @@ class ProductoAdmin(admin.ModelAdmin):
 
     def estado_badge(self, obj):
         if obj.estado:
-            return format_html('<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">Activo</span>')
-        return format_html('<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">Inactivo</span>')
+            return format_html('<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>', 'Activo')
+        return format_html('<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>', 'Inactivo')
     estado_badge.short_description = 'Estado'
 
     def imagen_preview(self, obj):
@@ -107,8 +107,8 @@ class InventarioAdmin(admin.ModelAdmin):
 
     def estado_stock(self, obj):
         if obj.stock_actual <= obj.producto.stock_minimo:
-            return format_html('<span style="color: red; font-weight: bold;">⚠ Stock Bajo</span>')
-        return format_html('<span style="color: green;">✓ Stock OK</span>')
+            return format_html('<span style="color: red; font-weight: bold;">{} Stock Bajo</span>','⚠')
+        return format_html('<span style="color: green;">{} Stock OK</span>','✓')
     estado_stock.short_description = 'Estado'
 
 
@@ -131,8 +131,8 @@ class MovimientoInventarioAdmin(admin.ModelAdmin):
 
     def tipo_movimiento_badge(self, obj):
         if obj.tipo_movimiento == 'ENTRADA':
-            return format_html('<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">↑ ENTRADA</span>')
-        return format_html('<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">↓ SALIDA</span>')
+            return format_html('<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>', '↑ ENTRADA')
+        return format_html('<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>', '↓ SALIDA')
     tipo_movimiento_badge.short_description = 'Tipo'
 
     def save_model(self, request, obj, form, change):
