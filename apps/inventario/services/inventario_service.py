@@ -139,50 +139,20 @@ class ProductoService:
     
     @staticmethod
     @transaction.atomic
-    def crear_producto(codigo, nombre, categoria_id, precio_compra, precio_venta,
-                      fecha_ingreso, stock_minimo=0, descripcion=None,
-                      estado=True, imagen=None):
+    def crear_producto(**data):
         """
         Crear un nuevo producto con su inventario inicial
-        
-        Args:
-            codigo: Código único del producto
-            nombre: Nombre del producto
-            categoria_id: ID de la categoría
-            precio_compra: Precio de compra
-            precio_venta: Precio de venta
-            fecha_ingreso: Fecha de ingreso al sistema
-            stock_minimo: Stock mínimo permitido
-            descripcion: Descripción opcional
-            estado: Estado activo/inactivo
-            imagen: Imagen del producto (opcional)
-        
-        Returns:
-            Producto: Instancia del producto creado
+
+        data proviene directamente de serializer.validated_data
         """
-        # Obtener la categoría
-        categoria = Categoria.objects.get(id=categoria_id)
-        
-        # Crear el producto
-        producto = Producto.objects.create(
-            codigo=codigo.strip().upper(),
-            nombre=nombre.strip(),
-            categoria=categoria,
-            precio_compra=precio_compra,
-            precio_venta=precio_venta,
-            fecha_ingreso=fecha_ingreso,
-            stock_minimo=stock_minimo,
-            descripcion=descripcion.strip() if descripcion else None,
-            estado=estado,
-            imagen=imagen
-        )
-        
-        # Crear inventario inicial en 0
+
+        producto = Producto.objects.create(**data)
+
         Inventario.objects.create(
             producto=producto,
             stock_actual=0
         )
-        
+
         return producto
     
     @staticmethod
