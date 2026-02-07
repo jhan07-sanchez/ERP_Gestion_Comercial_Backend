@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/ventas/', include('apps.ventas.urls', namespace='ventas')),
     path('api/compras/', include('apps.compras.urls', namespace='compras')),
     path('api/clientes/', include('apps.clientes.urls', namespace='clientes')),
+    path('api/proveedores/', include('apps.proveedores.urls', namespace='proveedores')),
 
 ]
 

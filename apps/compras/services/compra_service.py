@@ -18,6 +18,7 @@ from decimal import Decimal
 
 from apps.compras.models import Compra, DetalleCompra
 from apps.inventario.models import Producto, Inventario, MovimientoInventario
+from apps.proveedores.models import Proveedor
 
 
 # ============================================================================
@@ -34,7 +35,7 @@ class CompraService:
         Crear una nueva compra con sus detalles
         
         Args:
-            proveedor: Nombre del proveedor
+            proveedor_id: ID del proveedor
             detalles: Lista de diccionarios con producto_id, cantidad, precio_compra
             usuario: Usuario que crea la compra
         
@@ -42,10 +43,11 @@ class CompraService:
             Compra: Instancia de la compra creada
         
         Proceso:
-            1. Crear la compra
-            2. Crear detalles
-            3. Actualizar inventario (aumentar stock)
-            4. Registrar movimientos
+            1. Obtener el proveedor
+            2. Crear la compra
+            3. Crear detalles
+            4. Actualizar inventario (aumentar stock)
+            5. Registrar movimientos
         """
         # 1. Calcular el total
         total = Decimal('0.00')
@@ -249,7 +251,7 @@ class CompraService:
         )['promedio'] or 0
         
         # Top proveedores
-        top_proveedores = queryset.values('proveedor').annotate(
+        top_proveedores = queryset.values('proveedor__nombre', 'proveedor__id').annotate(
             total_compras=Count('id'),
             total_invertido=Sum('total')
         ).order_by('-total_invertido')[:5]
@@ -271,16 +273,16 @@ class CompraService:
         return estadisticas
     
     @staticmethod
-    def obtener_compras_por_proveedor(proveedor_nombre):
+    def obtener_compras_por_proveedor(proveedor_id):
         """
         Obtener todas las compras de un proveedor específico
-        
+
         Args:
-            proveedor_nombre: Nombre del proveedor
-        
+            proveedor_id: ID del proveedor
+
         Returns:
             QuerySet: Compras del proveedor
         """
         return Compra.objects.filter(
-            proveedor__icontains=proveedor_nombre
-        ).select_related('usuario').prefetch_related('detalles')
+        proveedor_id=proveedor_id
+        ).select_related('usuario', 'proveedor').prefetch_related('detalles')

@@ -106,9 +106,13 @@ class CompraViewSet(viewsets.ModelViewSet):
         )
         
         # Filtro por proveedor
-        proveedor = self.request.query_params.get('proveedor', None)
-        if proveedor:
-            queryset = queryset.filter(proveedor__icontains=proveedor)
+        proveedor_id = self.request.query_params.get('proveedor_id', None)
+        if proveedor_id:
+            queryset = queryset.filter(proveedor_id=proveedor_id)
+    
+        proveedor_nombre = self.request.query_params.get('proveedor', None)
+        if proveedor_nombre:
+            queryset = queryset.filter(proveedor__nombre__icontains=proveedor_nombre)
         
         # Filtro por usuario
         usuario_id = self.request.query_params.get('usuario_id', None)
@@ -150,7 +154,7 @@ class CompraViewSet(viewsets.ModelViewSet):
         
         try:
             compra = CompraService.crear_compra(
-                proveedor=serializer.validated_data['proveedor'],
+                proveedor=serializer.validated_data['proveedor_id'],
                 detalles=serializer.validated_data['detalles'],
                 usuario=request.user
             )
@@ -300,27 +304,49 @@ class CompraViewSet(viewsets.ModelViewSet):
     def por_proveedor(self, request):
         """
         Obtener compras de un proveedor específico
-        
-        GET /api/compras/por_proveedor/?proveedor=NombreProveedor
+    
+        GET /api/compras/compras/por_proveedor/?proveedor_id=1
         """
-        proveedor = request.query_params.get('proveedor', None)
-        
-        if not proveedor:
+        proveedor_id = request.query_params.get('proveedor_id', None)
+    
+        if not proveedor_id:
             return Response(
-                {'error': 'El parámetro "proveedor" es requerido.'},
+                {'error': 'El parámetro "proveedor_id" es requerido.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        compras = CompraService.obtener_compras_por_proveedor(proveedor)
+    
+        try:
+            proveedor_id = int(proveedor_id)
+        except ValueError:
+            return Response(
+                {'error': 'El proveedor_id debe ser un número.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+        compras = CompraService.obtener_compras_por_proveedor(proveedor_id)
         serializer = CompraListSerializer(compras, many=True)
-        
+    
+        # Obtener información del proveedor
+        if compras.exists():
+            proveedor_nombre = compras.first().proveedor.nombre
+        else:
+            from apps.proveedores.models import Proveedor
+        try:
+            proveedor = Proveedor.objects.get(id=proveedor_id)
+            proveedor_nombre = proveedor.nombre
+        except Proveedor.DoesNotExist:
+            return Response(
+                {'error': 'Proveedor no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
         return Response({
-            'proveedor': proveedor,
+            'proveedor_id': proveedor_id,
+            'proveedor_nombre': proveedor_nombre,
             'count': compras.count(),
             'total_invertido': compras.aggregate(total=Sum('total'))['total'] or 0,
             'compras': serializer.data
-        })
-
+    })
 
 # ============================================================================
 # VIEWSET DE DETALLES DE COMPRA (Solo lectura)

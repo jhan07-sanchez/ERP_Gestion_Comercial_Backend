@@ -14,6 +14,7 @@ Fecha: 2026-01-29
 from rest_framework import serializers
 from apps.compras.models import Compra, DetalleCompra
 from apps.inventario.models import Producto
+from apps.proveedores.serializers import ProveedorSimpleSerializer
 
 
 # ============================================================================
@@ -106,15 +107,22 @@ class CompraListSerializer(serializers.ModelSerializer):
     - Nombre del usuario
     - Total de productos
     """
+
+    proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
+    proveedor_documento = serializers.CharField(source='proveedor.documento', read_only=True)
+    proveedor_info = ProveedorSimpleSerializer(source='proveedor', read_only=True)
+
     usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
     total_productos = serializers.SerializerMethodField()
     total_unidades = serializers.SerializerMethodField()
-    
     class Meta:
         model = Compra
         fields = [
             'id',
             'proveedor',
+            'proveedor_nombre',         # NUEVO
+            'proveedor_documento',      # NUEVO
+            'proveedor_info',
             'usuario',
             'usuario_nombre',
             'total',
@@ -147,6 +155,10 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     - Detalles de productos comprados
     - Estadísticas y márgenes
     """
+    # Proveedor
+    proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
+    proveedor_info = ProveedorSimpleSerializer(source='proveedor', read_only=True)
+
     # Usuario
     usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
     usuario_email = serializers.EmailField(source='usuario.email', read_only=True)
@@ -164,6 +176,8 @@ class CompraDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'proveedor',
+            'proveedor_nombre',        # NUEVO
+            'proveedor_info',          # NUEVO
             'usuario',
             'usuario_nombre',
             'usuario_email',
@@ -223,7 +237,7 @@ class CompraSimpleSerializer(serializers.ModelSerializer):
     - Reportes
     - Relaciones con otras entidades
     """
-    
+    proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
     class Meta:
         model = Compra
-        fields = ['id', 'proveedor', 'total', 'fecha']
+        fields = ['id', 'proveedor', 'proveedor_nombre', 'total', 'fecha']

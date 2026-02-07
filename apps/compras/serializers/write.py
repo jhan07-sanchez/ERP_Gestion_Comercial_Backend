@@ -15,6 +15,7 @@ from rest_framework import serializers
 from django.db import transaction
 from apps.compras.models import Compra, DetalleCompra
 from apps.inventario.models import Producto
+from apps.proveedores.models import Proveedor
 
 
 # ============================================================================
@@ -100,12 +101,27 @@ class CompraCreateSerializer(serializers.Serializer):
     2. Crea compra y detalles
     3. Aumenta stock automáticamente
     """
-    proveedor = serializers.CharField(max_length=200)
+    proveedor = serializers.IntegerField()
     detalles = DetalleCompraWriteSerializer(many=True)
     
     def validate_proveedor(self, value):
-        """Validar que el proveedor no esté vacío"""
-        if not value or len(value.strip()) == 0:
+        """Validar que el proveedor exista"""
+        try:
+            proveedor = Proveedor.objects.get(id=value)
+            return value
+        except Proveedor.DoesNotExist:
+            raise serializers.ValidationError(
+                f"El proveedor con ID {value} no existe."
+            )
+    
+    def validate_detalles(self, value):
+        """Validar que haya al menos un detalle"""
+        if not value or len(value) == 0:
+            raise serializers.ValidationError(
+                "Debe incluir al menos un producto en la compra."
+            )
+        
+        if len(value) > 100:
             raise serializers.ValidationError(
                 "El nombre del proveedor es requerido."
             )
