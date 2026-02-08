@@ -27,7 +27,7 @@ class ProveedorService:
     
     @staticmethod
     @transaction.atomic
-    def crear_proveedor(nombre, documento, telefono=None, email=None, direccion=None, activo=True):
+    def crear_proveedor(nombre, documento, telefono=None, email=None, direccion=None, estado=True):
         """
         Crear un nuevo proveedor
         
@@ -37,7 +37,7 @@ class ProveedorService:
             telefono: Teléfono (opcional)
             email: Email (opcional)
             direccion: Dirección (opcional)
-            activo: Estado activo/inactivo
+            estado: Estado activo/inactivo
         
         Returns:
             Proveedor: Instancia del proveedor creado
@@ -48,7 +48,7 @@ class ProveedorService:
             telefono=telefono,
             email=email,
             direccion=direccion,
-            activo=activo
+            estado=estado
         )
         
         return proveedor
@@ -77,8 +77,8 @@ class ProveedorService:
             proveedor.email = kwargs['email']
         if 'direccion' in kwargs:
             proveedor.direccion = kwargs['direccion']
-        if 'activo' in kwargs:
-            proveedor.activo = kwargs['activo']
+        if 'estado' in kwargs:
+            proveedor.estado = kwargs['estado']
         
         proveedor.save()
         return proveedor
@@ -95,7 +95,7 @@ class ProveedorService:
             Proveedor: Instancia del proveedor activado
         """
         proveedor = Proveedor.objects.get(id=proveedor_id)
-        proveedor.activo = True
+        proveedor.estado = True
         proveedor.save()
         return proveedor
     
@@ -111,7 +111,7 @@ class ProveedorService:
             Proveedor: Instancia del proveedor desactivado
         """
         proveedor = Proveedor.objects.get(id=proveedor_id)
-        proveedor.activo = False
+        proveedor.estado = False
         proveedor.save()
         return proveedor
     
@@ -135,7 +135,7 @@ class ProveedorService:
                     'id': proveedor.id,
                     'nombre': proveedor.nombre,
                     'documento': proveedor.documento,
-                    'estado': 'ACTIVO' if proveedor.activo else 'INACTIVO'
+                    'estado': 'ACTIVO' if proveedor.estado else 'INACTIVO'
                 },
                 'compras': {
                     'total_compras': 0,
@@ -189,7 +189,7 @@ class ProveedorService:
                 'documento': proveedor.documento,
                 'email': proveedor.email,
                 'telefono': proveedor.telefono,
-                'estado': 'ACTIVO' if proveedor.activo else 'INACTIVO',
+                'estado': 'ACTIVO' if proveedor.estado else 'INACTIVO',
                 'fecha_registro': proveedor.fecha_creacion
             },
             'compras': {
@@ -222,7 +222,7 @@ class ProveedorService:
             QuerySet: Proveedores ordenados por número de compras
         """
         return Proveedor.objects.filter(
-            activo=True
+            estado=True
         ).annotate(
             total_compras=Count('compras'),
             total_comprado=Sum('compras__total')
@@ -242,7 +242,7 @@ class ProveedorService:
             QuerySet: Proveedores ordenados por total comprado
         """
         return Proveedor.objects.filter(
-            activo=True
+            estado=True
         ).annotate(
             total_compras=Count('compras'),
             total_comprado=Sum('compras__total')
@@ -266,7 +266,7 @@ class ProveedorService:
         
         # Proveedores con última compra antes de la fecha límite
         proveedores_con_compras_antiguas = Proveedor.objects.filter(
-            activo=True,
+            estado=True,
             compras__fecha__lt=fecha_limite
         ).annotate(
             ultima_compra=Max('compras__fecha')
@@ -274,7 +274,7 @@ class ProveedorService:
         
         # Proveedores sin compras
         proveedores_sin_compras = Proveedor.objects.filter(
-            activo=True
+            estado=True
         ).annotate(
             total_compras=Count('compras')
         ).filter(total_compras=0)

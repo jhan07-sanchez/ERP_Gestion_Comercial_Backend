@@ -40,7 +40,7 @@ class ProveedorListSerializer(serializers.ModelSerializer):
             'documento',
             'telefono',
             'email',
-            'activo',
+            'estado',
             'estado_badge',
             'fecha_creacion'
         ]
@@ -52,7 +52,7 @@ class ProveedorListSerializer(serializers.ModelSerializer):
         Returns:
             dict: Información de badge con color, texto, icono
         """
-        if obj.activo:
+        if obj.estado:
             return {
                 'texto': 'ACTIVO',
                 'color': 'green',
@@ -94,7 +94,7 @@ class ProveedorDetailSerializer(serializers.ModelSerializer):
             'telefono',
             'email',
             'direccion',
-            'activo',
+            'estado',
             'estado_badge',
             'total_compras',
             'total_comprado',
@@ -105,7 +105,7 @@ class ProveedorDetailSerializer(serializers.ModelSerializer):
     
     def get_estado_badge(self, obj):
         """Obtener badge del estado"""
-        if obj.activo:
+        if obj.estado:
             return {
                 'texto': 'ACTIVO',
                 'color': 'green',

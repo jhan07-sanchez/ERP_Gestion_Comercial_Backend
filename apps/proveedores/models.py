@@ -7,7 +7,7 @@ class Proveedor(models.Model):
     email = models.EmailField(blank=True)
     direccion = models.TextField(blank=True)
 
-    activo = models.BooleanField(default=True)
+    estado = models.BooleanField(default=True)
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)

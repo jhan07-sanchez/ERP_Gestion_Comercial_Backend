@@ -105,9 +105,9 @@ class ProveedorViewSet(viewsets.ModelViewSet):
         queryset = Proveedor.objects.all()
         
         # Filtro por estado
-        activo = self.request.query_params.get('activo', None)
-        if activo is not None:
-            queryset = queryset.filter(activo=activo.lower() == 'true')
+        estado = self.request.query_params.get('estado', None)
+        if estado is not None:
+            queryset = queryset.filter(estado=estado.lower() == 'true')
         
         # Filtro por nombre
         nombre = self.request.query_params.get('nombre', None)
@@ -143,7 +143,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
                 telefono=serializer.validated_data.get('telefono'),
                 email=serializer.validated_data.get('email'),
                 direccion=serializer.validated_data.get('direccion'),
-                activo=serializer.validated_data.get('activo', True)
+                estado=serializer.validated_data.get('estado', True)
             )
             
             response_serializer = ProveedorDetailSerializer(proveedor)
@@ -174,7 +174,7 @@ class ProveedorViewSet(viewsets.ModelViewSet):
                 telefono=serializer.validated_data.get('telefono'),
                 email=serializer.validated_data.get('email'),
                 direccion=serializer.validated_data.get('direccion'),
-                activo=serializer.validated_data.get('activo')
+                estado=serializer.validated_data.get('estado')
             )
             
             response_serializer = ProveedorDetailSerializer(proveedor)

@@ -42,7 +42,7 @@ class ProveedorCreateSerializer(serializers.ModelSerializer):
             'telefono',
             'email',
             'direccion',
-            'activo'
+            'estado'
         ]
     
     def validate_nombre(self, value):
@@ -146,7 +146,7 @@ class ProveedorUpdateSerializer(serializers.ModelSerializer):
             'telefono',
             'email',
             'direccion',
-            'activo'
+            'estado'
         ]
     
     def validate_nombre(self, value):
@@ -202,4 +202,4 @@ class ProveedorActivateSerializer(serializers.Serializer):
     - POST /api/proveedores/{id}/activar/
     - POST /api/proveedores/{id}/desactivar/
     """
-    activo = serializers.BooleanField(required=True)
+    estado = serializers.BooleanField(required=True)
