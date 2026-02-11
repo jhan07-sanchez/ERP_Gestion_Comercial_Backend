@@ -30,7 +30,7 @@ class CompraService:
     
     @staticmethod
     @transaction.atomic
-    def crear_compra(proveedor, detalles, usuario):
+    def crear_compra(proveedor, detalles, usuario, fecha, estado='PENDIENTE'):
         """
         Crear una nueva compra con sus detalles
         
@@ -38,6 +38,8 @@ class CompraService:
             proveedor_id: ID del proveedor
             detalles: Lista de diccionarios con producto_id, cantidad, precio_compra
             usuario: Usuario que crea la compra
+            fecha: Fecha de la compra (opcional, por defecto hoy)
+            estado: Estado inicial ('PENDIENTE', 'ANULADA', 'REALIZADA')
         
         Returns:
             Compra: Instancia de la compra creada
@@ -61,7 +63,9 @@ class CompraService:
         compra = Compra.objects.create(
             proveedor=proveedor,
             usuario=usuario,
-            total=total
+            total=total,
+            fecha=fecha,
+            estado=estado
         )
         
         # 3. Crear detalles y actualizar inventario
@@ -153,10 +157,21 @@ class CompraService:
         
         # Eliminar la compra
         # (Si quieres mantener el registro, agrega un campo 'anulada' al modelo)
-        compra_id_backup = compra.id
-        compra.delete()
-        
-        return compra_id_backup
+        compra.estado = 'ANULADA'
+        compra.save()
+    
+        return compra
+    
+    @staticmethod
+    @transaction.atomic
+    def marcar_como_realizada(compra_id, usuario):
+        compra = Compra.objects.get(id=compra_id)
+        if compra.estado != 'PENDIENTE':
+                raise ValueError("Solo se pueden marcar como realizadas las compras pendientes.")
+        compra.estado = 'REALIZADA'
+        compra.save()
+        return compra
+
     
     @staticmethod
     def obtener_estadisticas_compra(compra_id):

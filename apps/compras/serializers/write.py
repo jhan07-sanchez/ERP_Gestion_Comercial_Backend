@@ -40,6 +40,7 @@ class DetalleCompraWriteSerializer(serializers.Serializer):
         required=False  # Se toma del producto si no se proporciona
     )
     
+    
     def validate_producto_id(self, value):
         """Validar que el producto existe"""
         try:
@@ -101,9 +102,17 @@ class CompraCreateSerializer(serializers.Serializer):
     2. Crea compra y detalles
     3. Aumenta stock automáticamente
     """
-    proveedor = serializers.IntegerField()
+    proveedor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Proveedor.objects.all(),
+        source='proveedor' # Para que se asigne al campo 'proveedor' del modelo
+    )
+    fecha = serializers.DateField()
     detalles = DetalleCompraWriteSerializer(many=True)
-    
+    estado = serializers.ChoiceField(
+        choices=['PENDIENTE', 'ANULADA', 'REALIZADA'],
+        default='PENDIENTE'
+    )
+
     def validate_proveedor(self, value):
         """Validar que el proveedor exista"""
         try:
@@ -201,6 +210,11 @@ class CompraUpdateSerializer(serializers.ModelSerializer):
                 "El nombre del proveedor debe tener al menos 3 caracteres."
             )
         return value.strip()
+    
+    def validate_estado(self, value):
+        if value not in ['PENDIENTE', 'ANULADA', 'REALIZADA']:
+            raise serializers.ValidationError("Estado no válido.")
+        return value
 
 
 class CompraAnularSerializer(serializers.Serializer):

@@ -111,10 +111,11 @@ class CompraListSerializer(serializers.ModelSerializer):
     proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
     proveedor_documento = serializers.CharField(source='proveedor.documento', read_only=True)
     proveedor_info = ProveedorSimpleSerializer(source='proveedor', read_only=True)
-
+    
     usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
     total_productos = serializers.SerializerMethodField()
     total_unidades = serializers.SerializerMethodField()
+    estado = serializers.CharField(read_only=True) 
     class Meta:
         model = Compra
         fields = [
@@ -171,6 +172,8 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     total_unidades = serializers.SerializerMethodField()
     margen_potencial = serializers.SerializerMethodField()
     
+    #Estado de la compra (pendiente, anulada, realizada)
+    estado = serializers.CharField(read_only=True)
     class Meta:
         model = Compra
         fields = [
@@ -238,6 +241,7 @@ class CompraSimpleSerializer(serializers.ModelSerializer):
     - Relaciones con otras entidades
     """
     proveedor_nombre = serializers.CharField(source='proveedor.nombre', read_only=True)
+    estado = serializers.CharField(read_only=True) 
     class Meta:
         model = Compra
-        fields = ['id', 'proveedor', 'proveedor_nombre', 'total', 'fecha']
+        fields = ['id', 'proveedor', 'proveedor_nombre', 'total', 'fecha', 'estado']

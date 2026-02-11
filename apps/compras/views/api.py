@@ -154,9 +154,11 @@ class CompraViewSet(viewsets.ModelViewSet):
         
         try:
             compra = CompraService.crear_compra(
-                proveedor=serializer.validated_data['proveedor_id'],
+                proveedor=serializer.validated_data['proveedor'],
                 detalles=serializer.validated_data['detalles'],
-                usuario=request.user
+                usuario=request.user,
+                fecha=serializer.validated_data['fecha'],
+                estado='PENDIENTE'
             )
             
             response_serializer = CompraDetailSerializer(compra)

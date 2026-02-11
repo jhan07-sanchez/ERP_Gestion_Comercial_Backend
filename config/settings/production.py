@@ -257,6 +257,6 @@ import os
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 
-print("🚀 Servidor corriendo en modo PRODUCCIÓN")
-print(f"🔒 Debug: {DEBUG}")
-print(f"🌐 Allowed Hosts: {ALLOWED_HOSTS}")
+print(" Servidor corriendo en modo PRODUCCIÓN")
+print(f" Debug: {DEBUG}")
+print(f" Allowed Hosts: {ALLOWED_HOSTS}")

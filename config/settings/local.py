@@ -172,7 +172,7 @@ import os
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 
-print("🚀 Servidor corriendo en modo DESARROLLO")
-print(f"📁 BASE_DIR: {BASE_DIR}")
-print(f"🗄️  Database: {DATABASES['default']['NAME']}")
-print(f"🔧 Debug: {DEBUG}")
+print(" Servidor corriendo en modo DESARROLLO")
+print(f" BASE_DIR: {BASE_DIR}")
+print(f"  Database: {DATABASES['default']['NAME']}")
+print(f" Debug: {DEBUG}")

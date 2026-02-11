@@ -10,13 +10,25 @@ class Compra(models.Model):
         on_delete=models.PROTECT,
         related_name='compras'
     )
+    
+    ESTADO_COMPRA = [
+        ('PENDIENTE', 'Pendiente'),
+        ('ANULADA', 'Anulada'),
+        ('REALIZADA', 'Realizada'),
+    ]
+    
     total = models.DecimalField(max_digits=10, decimal_places=2)
-    fecha = models.DateField()
+    fecha = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.PROTECT, 
         related_name='compras'
+    )
+    estado = models.CharField(
+        max_length=10,
+        choices=ESTADO_COMPRA,
+        default='PENDIENTE'
     )
 
     class Meta:
@@ -26,7 +38,7 @@ class Compra(models.Model):
         ordering = ['-fecha']
 
     def __str__(self):
-        return f"Compra #{self.id} - {self.proveedor} - ${self.total}"
+        return f"Compra #{self.id} - {self.proveedor} - ${self.total} - {self.fecha} - {self.estado}"
 
 
 class DetalleCompra(models.Model):

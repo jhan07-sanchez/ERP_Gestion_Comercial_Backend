@@ -30,10 +30,10 @@ DJANGO_ENV = os.getenv('DJANGO_ENV', 'local')
 # Cargar la configuración apropiada
 if DJANGO_ENV == 'production':
     from .production import *
-    print("✅ Usando configuración de PRODUCCIÓN")
+    print(" Servidor corriendo en modo PRODUCCIÓN")
 elif DJANGO_ENV == 'test':
     from .test import *
-    print("✅ Usando configuración de TESTING")
+    print(" Servidor corriendo en modo TESTING")
 else:
     from .local import *
-    print("✅ Usando configuración de DESARROLLO (local)")
+    print(" Usando configuración de DESARROLLO (local)")
