@@ -10,7 +10,7 @@ class Compra(models.Model):
         on_delete=models.PROTECT,
         related_name='compras'
     )
-    
+    motivo_anulacion = models.TextField(null=True, blank=True)
     ESTADO_COMPRA = [
         ('PENDIENTE', 'Pendiente'),
         ('ANULADA', 'Anulada'),

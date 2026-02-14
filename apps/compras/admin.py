@@ -8,13 +8,13 @@ class DetalleCompraInline(admin.TabularInline):
     model = DetalleCompra
     extra = 1
     readonly_fields = ('subtotal',)
-    fields = ('producto', 'cantidad', 'precio_compra', 'subtotal')
+    fields = ('producto', 'cantidad', 'precio_compra', 'subtotal',)
 
 
 @admin.register(Compra)
 class CompraAdmin(admin.ModelAdmin):
-    list_display = ('id', 'proveedor', 'total_formateado', 'usuario', 'fecha')
-    list_filter = ('fecha', 'proveedor')
+    list_display = ('id', 'proveedor', 'total_formateado', 'usuario', 'fecha', 'estado')
+    list_filter = ('fecha', 'proveedor', 'estado')
     search_fields = ('proveedor',)
     readonly_fields = ('fecha',)
     date_hierarchy = 'fecha'
@@ -22,7 +22,7 @@ class CompraAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información de la Compra', {
-            'fields': ('proveedor', 'total')
+            'fields': ('proveedor', 'total', 'estado')
         }),
         ('Usuario y Fecha', {
             'fields': ('usuario', 'fecha')

@@ -191,30 +191,95 @@ class CompraUpdateSerializer(serializers.ModelSerializer):
     Usado en:
     - PUT/PATCH /api/compras/{id}/
     
-    Nota: Solo se puede actualizar el proveedor.
-    Los detalles NO se pueden modificar una vez creados.
+    Permite actualizar:
+    - Proveedor
+    - Fecha
+    - Observaciones (si existe en el modelo)
+    - Estado
+    - Detalles (productos)
     """
+    # ✅ Definir explícitamente proveedor_id
+    proveedor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Proveedor.objects.all(),
+        source='proveedor',
+        required=False
+    )
+    
+    # ✅ Definir detalles para actualizar productos
+    detalles = DetalleCompraWriteSerializer(many=True, required=False)
     
     class Meta:
         model = Compra
-        fields = ['proveedor']
+        fields = ['proveedor_id', 'fecha', 'estado', 'detalles']  # ✅ Campos actualizables
     
-    def validate_proveedor(self, value):
-        """Validar el nombre del proveedor"""
-        if not value or len(value.strip()) == 0:
+    def validate_proveedor_id(self, value):
+        """Validar que el proveedor exista y esté activo"""
+        if not value:
             raise serializers.ValidationError(
-                "El nombre del proveedor es requerido."
+                "El proveedor es requerido."
             )
-        if len(value) < 3:
+        
+        # Verificar que el proveedor esté activo
+        if not value.estado:
             raise serializers.ValidationError(
-                "El nombre del proveedor debe tener al menos 3 caracteres."
+                "El proveedor seleccionado está inactivo."
             )
-        return value.strip()
+        
+        return value
     
     def validate_estado(self, value):
+        """Validar estado de la compra"""
         if value not in ['PENDIENTE', 'ANULADA', 'REALIZADA']:
             raise serializers.ValidationError("Estado no válido.")
         return value
+    
+    def validate(self, data):
+        """Validaciones a nivel de objeto"""
+        # Si se están actualizando detalles, recalcular total
+        if 'detalles' in data:
+            total = sum(
+                detalle['cantidad'] * detalle.get(
+                    'precio_compra',
+                    Producto.objects.get(id=detalle['producto_id']).precio_compra
+                )
+                for detalle in data['detalles']
+            )
+            data['total'] = total
+        
+        return data
+    
+    def update(self, instance, validated_data):
+        """Actualizar la compra"""
+        from django.db import transaction
+        
+        # Extraer detalles si existen
+        detalles_data = validated_data.pop('detalles', None)
+        
+        # Actualizar campos de la compra
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        # Si hay detalles nuevos, eliminar los viejos y crear nuevos
+        if detalles_data is not None:
+            with transaction.atomic():
+                # Eliminar detalles existentes
+                instance.detalles.all().delete()
+                
+                # Crear nuevos detalles
+                for detalle_data in detalles_data:
+                    producto = Producto.objects.get(id=detalle_data['producto_id'])
+                    precio = detalle_data.get('precio_compra', producto.precio_compra)
+                    
+                    DetalleCompra.objects.create(
+                        compra=instance,
+                        producto=producto,
+                        cantidad=detalle_data['cantidad'],
+                        precio_compra=precio,
+                        subtotal=detalle_data['cantidad'] * precio
+                    )
+        
+        instance.save()
+        return instance
 
 
 class CompraAnularSerializer(serializers.Serializer):

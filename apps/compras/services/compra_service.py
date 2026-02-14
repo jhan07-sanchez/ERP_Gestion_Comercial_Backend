@@ -83,96 +83,82 @@ class CompraService:
                 precio_compra=precio,
                 subtotal=subtotal
             )
-            
-            # Aumentar inventario
-            inventario, created = Inventario.objects.get_or_create(
-                producto=producto,
-                defaults={'stock_actual': 0}
-            )
-            inventario.stock_actual += cantidad
-            inventario.save()
-            
-            # Registrar movimiento de inventario
-            MovimientoInventario.objects.create(
-                producto=producto,
-                tipo_movimiento='ENTRADA',
-                cantidad=cantidad,
-                referencia=f'COMPRA-{compra.id}',
-                usuario=usuario
-            )
-        
+
+
         return compra
     
     @staticmethod
     @transaction.atomic
     def anular_compra(compra_id, usuario, motivo):
-        """
-        Anular una compra
-        
-        Args:
-            compra_id: ID de la compra
-            usuario: Usuario que anula la compra
-            motivo: Motivo de la anulación
-        
-        Returns:
-            Compra: Instancia de la compra anulada
-        
-        Proceso:
-            1. Validar que se pueda anular
-            2. Reducir stock
-            3. Registrar movimientos de anulación
-            4. Eliminar la compra (o marcarla como anulada si tienes ese campo)
-        
-        Nota: En este caso eliminamos la compra, pero podrías agregar
-        un campo 'estado' al modelo Compra y solo cambiar el estado.
-        """
-        compra = Compra.objects.select_related('usuario').prefetch_related(
+
+        compra = Compra.objects.prefetch_related(
             'detalles__producto'
         ).get(id=compra_id)
-        
-        # Reducir stock y registrar movimientos
-        for detalle in compra.detalles.all():
-            # Reducir del inventario
-            inventario = Inventario.objects.get(producto=detalle.producto)
-            
-            # Verificar que haya suficiente stock para anular
-            if inventario.stock_actual < detalle.cantidad:
-                raise ValueError(
-                    f'No hay suficiente stock del producto {detalle.producto.nombre} '
-                    f'para anular esta compra. Stock actual: {inventario.stock_actual}, '
-                    f'Requerido: {detalle.cantidad}'
+
+        if compra.estado == 'ANULADA':
+            raise ValueError("La compra ya está anulada.")
+
+        if compra.estado == 'REALIZADA':
+            # Revertir inventario
+            for detalle in compra.detalles.all():
+
+                inventario = Inventario.objects.get(producto=detalle.producto)
+
+                if inventario.stock_actual < detalle.cantidad:
+                    raise ValueError(
+                        f"No hay stock suficiente para anular."
                 )
-            
-            inventario.stock_actual -= detalle.cantidad
-            inventario.save()
-            
-            # Registrar movimiento de salida (anulación)
-            MovimientoInventario.objects.create(
-                producto=detalle.producto,
-                tipo_movimiento='SALIDA',
-                cantidad=detalle.cantidad,
-                referencia=f'ANULACIÓN COMPRA-{compra.id}: {motivo}',
-                usuario=usuario
-            )
-        
-        # Eliminar la compra
-        # (Si quieres mantener el registro, agrega un campo 'anulada' al modelo)
+
+                inventario.stock_actual -= detalle.cantidad
+                inventario.save()
+
+                MovimientoInventario.objects.create(
+                    producto=detalle.producto,
+                    tipo_movimiento='SALIDA',
+                    cantidad=detalle.cantidad,
+                    referencia=f'ANULACIÓN COMPRA-{compra.id}: {motivo}',
+                    usuario=usuario
+                )
+
         compra.estado = 'ANULADA'
+        compra.motivo_anulacion = motivo
         compra.save()
-    
+
         return compra
+
     
     @staticmethod
     @transaction.atomic
     def marcar_como_realizada(compra_id, usuario):
-        compra = Compra.objects.get(id=compra_id)
+
+        compra = Compra.objects.prefetch_related('detalles__producto').get(id=compra_id)
+
         if compra.estado != 'PENDIENTE':
-                raise ValueError("Solo se pueden marcar como realizadas las compras pendientes.")
+            raise ValueError("Solo compras pendientes pueden confirmarse.")
+
+        for detalle in compra.detalles.all():
+
+            inventario, created = Inventario.objects.get_or_create(
+                producto=detalle.producto,
+                defaults={'stock_actual': 0}
+            )
+
+            inventario.stock_actual += detalle.cantidad
+            inventario.save()
+
+            MovimientoInventario.objects.create(
+                producto=detalle.producto,
+                tipo_movimiento='ENTRADA',
+                cantidad=detalle.cantidad,
+                referencia=f'COMPRA-{compra.id}',
+                usuario=usuario
+            )
+
         compra.estado = 'REALIZADA'
         compra.save()
+
         return compra
 
-    
     @staticmethod
     def obtener_estadisticas_compra(compra_id):
         """

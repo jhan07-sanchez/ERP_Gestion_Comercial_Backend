@@ -237,18 +237,16 @@ class CompraViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         try:
-            compra_id = CompraService.anular_compra(
+            compra = CompraService.anular_compra(
                 compra_id=compra.id,
                 usuario=request.user,
                 motivo=serializer.validated_data['motivo']
             )
-            
-            return Response(
-                {
-                    'detail': 'Compra anulada exitosamente',
-                    'compra_id': compra_id
-                }
-            )
+            response_serializer = CompraDetailSerializer(compra)
+            return Response({
+                'detail': 'Compra anulada exitosamente',
+                'compra': response_serializer.data
+            })
         except ValueError as e:
             return Response(
                 {'error': str(e)},
@@ -302,6 +300,32 @@ class CompraViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    # Acción personalizada para marcar una compra como confirmada (realizada)
+    @action(detail=True, methods=['post'])
+    def confirmar(self, request, pk=None):
+
+        compra = self.get_object()
+
+        try:
+            compra = CompraService.marcar_como_realizada(
+                compra_id=compra.id,
+                usuario=request.user
+            )
+
+            serializer = CompraDetailSerializer(compra)
+
+            return Response({
+            "detail": "Compra confirmada exitosamente",
+            "compra": serializer.data
+            })
+
+        except ValueError as e:
+            return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    
     @action(detail=False, methods=['get'])
     def por_proveedor(self, request):
         """
@@ -349,6 +373,8 @@ class CompraViewSet(viewsets.ModelViewSet):
             'total_invertido': compras.aggregate(total=Sum('total'))['total'] or 0,
             'compras': serializer.data
     })
+        
+        
 
 # ============================================================================
 # VIEWSET DE DETALLES DE COMPRA (Solo lectura)

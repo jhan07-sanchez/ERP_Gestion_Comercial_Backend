@@ -129,7 +129,8 @@ class CompraListSerializer(serializers.ModelSerializer):
             'total',
             'total_productos',
             'total_unidades',
-            'fecha'
+            'fecha',
+            'estado'                    # NUEVO
         ]
     
     def get_total_productos(self, obj):
@@ -172,6 +173,9 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     total_unidades = serializers.SerializerMethodField()
     margen_potencial = serializers.SerializerMethodField()
     
+    #motivo de anulacion (si existe)
+    motivo_anulacion = serializers.CharField(read_only=True)
+
     #Estado de la compra (pendiente, anulada, realizada)
     estado = serializers.CharField(read_only=True)
     class Meta:
@@ -189,7 +193,9 @@ class CompraDetailSerializer(serializers.ModelSerializer):
             'total_productos',
             'total_unidades',
             'margen_potencial',
-            'fecha'
+            'fecha',
+            'estado',                   # NUEVO
+            'motivo_anulacion'           # NUEVO
         ]
     
     def get_total_productos(self, obj):
