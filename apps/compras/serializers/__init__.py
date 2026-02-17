@@ -9,11 +9,9 @@ Organización:
 
 from .read import (
     # Simples
-    ProductoSimpleSerializer,
-    
+    ProductoCompraSerializer,
     # Detalle de Compra
     DetalleCompraReadSerializer,
-    
     # Compra
     CompraListSerializer,
     CompraDetailSerializer,
@@ -32,7 +30,7 @@ from .write import (
 
 __all__ = [
     # READ - Simples
-    'ProductoSimpleSerializer',
+    'ProductoCompraSerializer',
     
     # READ - Detalle de Compra
     'DetalleCompraReadSerializer',

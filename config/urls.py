@@ -10,21 +10,19 @@ from apps.usuarios.serializers.jwt import CustomTokenObtainPairView
 
 urlpatterns = [
     # Django Admin
-    path('admin/', admin.site.urls),
-
+    path("admin/", admin.site.urls),
     # JWT Authentication (Con vista personalizada)
-    path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
-
+    path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     # API Endpoints
-    path('api/', include('apps.usuarios.urls', namespace='usuarios')),
-    path('api/inventario/', include('apps.inventario.urls', namespace='inventario')),
-    path('api/ventas/', include('apps.ventas.urls', namespace='ventas')),
-    path('api/compras/', include('apps.compras.urls', namespace='compras')),
-    path('api/clientes/', include('apps.clientes.urls', namespace='clientes')),
-    path('api/proveedores/', include('apps.proveedores.urls', namespace='proveedores')),
-
+    path("api/", include("apps.usuarios.urls", namespace="usuarios")),
+    path("api/inventario/", include("apps.inventario.urls", namespace="inventario")),
+    path("api/ventas/", include("apps.ventas.urls", namespace="ventas")),
+    path("api/compras/", include("apps.compras.urls", namespace="compras")),
+    path("api/clientes/", include("apps.clientes.urls", namespace="clientes")),
+    path("api/proveedores/", include("apps.proveedores.urls", namespace="proveedores")),
+    path("api/documentos/", include("apps.documentos.urls" , namespace="documentos")),
 ]
 
 # Servir archivos media en desarrollo

@@ -41,28 +41,27 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
-    'rest_framework',
-    'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
-    'corsheaders',
-    'django_filters',
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+    "django_filters",
     "django_extensions",
 ]
 
 LOCAL_APPS = [
     # Core ERP
-    'apps.usuarios.apps.UsuariosConfig',
-    'apps.clientes.apps.ClientesConfig',
-    'apps.proveedores.apps.ProveedoresConfig',
-    
+    "apps.usuarios.apps.UsuariosConfig",
+    "apps.clientes.apps.ClientesConfig",
+    "apps.proveedores.apps.ProveedoresConfig",
+    "apps.documentos.apps.DocumentosConfig",
     # Operaciones
-    'apps.inventario.apps.InventarioConfig',
-    'apps.ventas.apps.VentasConfig',
-    'apps.compras.apps.ComprasConfig',
-    'apps.caja.apps.CajaConfig',
-    
+    "apps.inventario.apps.InventarioConfig",
+    "apps.ventas.apps.VentasConfig",
+    "apps.compras.apps.ComprasConfig",
+    "apps.caja.apps.CajaConfig",
     # Configuración
-    'apps.configuracion.apps.ConfiguracionConfig',
+    "apps.configuracion.apps.ConfiguracionConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -176,3 +175,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # =================
 
 AUTH_USER_MODEL = 'usuarios.Usuario'
+
+
+# Logging para documentos
+LOGGING = {
+    "version": 1,
+    "loggers": {
+        "documentos": {
+            "handlers": ["file"],
+            "level": "INFO",
+        },
+    },
+}
