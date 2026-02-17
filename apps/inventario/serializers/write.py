@@ -94,7 +94,6 @@ class ProductoCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Producto
         fields = [
-            'codigo',
             'nombre',
             'descripcion',
             'categoria',
@@ -105,44 +104,7 @@ class ProductoCreateSerializer(serializers.ModelSerializer):
             'estado',
             'imagen'
         ]
-
-    def validate_codigo(self, value):
-        """
-        Validar que el código del producto sea único
-
-        El código debe ser:
-        - Único en el sistema
-        - Alfanumérico
-        - Sin espacios
-        - En mayúsculas
-        """
-        # Convertir a mayúsculas y eliminar espacios
-        value = value.strip().upper().replace(' ', '')
-
-        # Validar formato
-        if not value.isalnum():
-            raise serializers.ValidationError(
-                "El código solo puede contener letras y números."
-            )
-
-        # Validar longitud
-        if len(value) < 3:
-            raise serializers.ValidationError(
-                "El código debe tener al menos 3 caracteres."
-            )
-
-        if len(value) > 50:
-            raise serializers.ValidationError(
-                "El código no puede tener más de 50 caracteres."
-            )
-
-        # Validar unicidad
-        if Producto.objects.filter(codigo=value).exists():
-            raise serializers.ValidationError(
-                f"Ya existe un producto con el código '{value}'."
-            )
-
-        return value
+        
 
     def validate_nombre(self, value):
         """Validar nombre del producto"""

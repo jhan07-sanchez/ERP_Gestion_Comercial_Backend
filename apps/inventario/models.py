@@ -30,6 +30,7 @@ class Producto(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
+
     class Meta:
         db_table = 'productos'
         verbose_name = 'Producto'
@@ -37,6 +38,27 @@ class Producto(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.nombre}"
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            self.codigo = self.generar_siguiente_codigo()
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def generar_siguiente_codigo():
+        ultimo = Producto.objects.filter(codigo__startswith="PROD-") \
+                                .order_by('-codigo') \
+                                .first()
+
+        if ultimo:
+            numero = int(ultimo.codigo.split('-')[1])
+            siguiente = numero + 1
+        else:
+            siguiente = 1
+
+        return f"PROD-{siguiente:04d}"
+
+
 
 
 class Inventario(models.Model):
