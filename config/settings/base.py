@@ -62,6 +62,8 @@ LOCAL_APPS = [
     "apps.caja.apps.CajaConfig",
     # Configuración
     "apps.configuracion.apps.ConfiguracionConfig",
+    # Dashboard KPIs
+    "apps.dashboard.apps.DashboardConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -182,6 +184,11 @@ LOGGING = {
     "version": 1,
     "loggers": {
         "documentos": {
+            "handlers": ["file"],
+            "level": "INFO",
+        },
+        # dashboar
+        "dashboard": {
             "handlers": ["file"],
             "level": "INFO",
         },
