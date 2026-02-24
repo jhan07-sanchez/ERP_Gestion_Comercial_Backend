@@ -13,8 +13,6 @@ los ViewSets limpios y enfocados en la capa HTTP.
 from django.db import transaction
 from django.db.models import Sum, Count, Avg, Q
 from django.utils import timezone
-from decimal import Decimal
-
 from apps.clientes.models import Cliente
 
 
@@ -27,13 +25,13 @@ class ClienteService:
     
     @staticmethod
     @transaction.atomic
-    def crear_cliente(nombre, documento, telefono=None, email=None, direccion=None, estado=True):
+    def crear_cliente(nombre, tipo_documento, numero_documento, telefono=None, email=None, direccion=None, estado=True):
         """
         Crear un nuevo cliente
         
         Args:
             nombre: Nombre completo del cliente
-            documento: Número de documento (único)
+            numero_documento: Número de documento (único)
             telefono: Teléfono (opcional)
             email: Email (opcional)
             direccion: Dirección (opcional)
@@ -44,7 +42,8 @@ class ClienteService:
         """
         cliente = Cliente.objects.create(
             nombre=nombre,
-            documento=documento,
+            tipo_documento=tipo_documento,
+            numero_documento=numero_documento,
             telefono=telefono,
             email=email,
             direccion=direccion,
@@ -71,6 +70,10 @@ class ClienteService:
         # Actualizar campos proporcionados
         if 'nombre' in kwargs:
             cliente.nombre = kwargs['nombre']
+        if "tipo_documento" in kwargs:
+            cliente.tipo_documento = kwargs["tipo_documento"] 
+        if 'numero_documento' in kwargs:
+            cliente.numero_documento = kwargs['numero_documento']
         if 'telefono' in kwargs:
             cliente.telefono = kwargs['telefono']
         if 'email' in kwargs:
@@ -134,7 +137,7 @@ class ClienteService:
                 'cliente': {
                     'id': cliente.id,
                     'nombre': cliente.nombre,
-                    'documento': cliente.documento,
+                    'numero_documento': cliente.numero_documento,
                     'estado': 'ACTIVO' if cliente.estado else 'INACTIVO'
                 },
                 'ventas': {
@@ -192,7 +195,7 @@ class ClienteService:
             'cliente': {
                 'id': cliente.id,
                 'nombre': cliente.nombre,
-                'documento': cliente.documento,
+                'numero_documento': cliente.numero_documento,
                 'email': cliente.email,
                 'telefono': cliente.telefono,
                 'estado': 'ACTIVO' if cliente.estado else 'INACTIVO',
@@ -306,7 +309,7 @@ class ClienteService:
         """
         return Cliente.objects.filter(
             Q(nombre__icontains=query) |
-            Q(documento__icontains=query) |
+            Q(numero_documento__icontains=query) |
             Q(email__icontains=query) |
             Q(telefono__icontains=query)
         )

@@ -1,8 +1,17 @@
 from django.db import models
 
 class Cliente(models.Model):
+
+    class TipoDocumento(models.TextChoices):
+        CEDULA = "CEDULA", "Cédula de ciudadanía"
+        NIT = "NIT", "NIT"
+        CEDULA_EXTRANJERA = "CEDULA_EXTRANJERA", "Cédula extranjera"
+
     nombre = models.CharField(max_length=200)
-    documento = models.CharField(max_length=50, unique=True)
+    tipo_documento = models.CharField(
+        max_length=30, choices=TipoDocumento.choices, default=TipoDocumento.CEDULA
+    )
+    numero_documento = models.CharField(max_length=50, unique=True)
     telefono = models.CharField(max_length=20, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     direccion = models.TextField(blank=True, null=True)
@@ -16,4 +25,4 @@ class Cliente(models.Model):
         verbose_name_plural = 'Clientes'
 
     def __str__(self):
-        return f"{self.nombre} - {self.documento}"
+        return f"{self.nombre} - {self.numero_documento}"

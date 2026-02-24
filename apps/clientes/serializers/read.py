@@ -37,7 +37,8 @@ class ClienteListSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'nombre',
-            'documento',
+            'tipo_documento',
+            'numero_documento',
             'telefono',
             'email',
             'estado',
@@ -90,7 +91,8 @@ class ClienteDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'nombre',
-            'documento',
+            'tipo_documento',
+            'numero_documento',
             'telefono',
             'email',
             'direccion',
@@ -176,4 +178,4 @@ class ClienteSimpleSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Cliente
-        fields = ['id', 'nombre', 'documento', 'telefono', 'email']
+        fields = ['id', 'nombre','tipo_documento', 'numero_documento', 'telefono', 'email']

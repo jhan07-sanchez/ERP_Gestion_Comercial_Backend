@@ -5,15 +5,15 @@ from .models import Cliente
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nombre', 'documento', 'telefono', 'email', 'estado', 'fecha_creacion')
+    list_display = ('id', 'nombre','tipo_documento', 'numero_documento', 'telefono', 'email', 'estado', 'fecha_creacion')
     list_filter = ('estado', 'fecha_creacion')
-    search_fields = ('nombre', 'documento', 'email', 'telefono')
+    search_fields = ('nombre', 'numero_documento', 'email', 'telefono')
     list_editable = ('estado',)
     readonly_fields = ('fecha_creacion', 'fecha_actualizacion')
     
     fieldsets = (
         ('Información Personal', {
-            'fields': ('nombre', 'documento')
+            'fields': ('nombre', 'numero_documento')
         }),
         ('Información de Contacto', {
             'fields': ('telefono', 'email', 'direccion')

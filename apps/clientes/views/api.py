@@ -30,7 +30,6 @@ from apps.clientes.serializers import (
 from apps.clientes.services import ClienteService
 
 from apps.usuarios.permissions import (
-    EsAdministrador,
     EsSupervisor,
     EsVendedor,
 )
@@ -114,16 +113,16 @@ class ClienteViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(nombre__icontains=nombre)
         
         # Filtro por documento
-        documento = self.request.query_params.get('documento', None)
-        if documento:
-            queryset = queryset.filter(documento__icontains=documento)
+        numero_documento = self.request.query_params.get('numero_documento', None)
+        if numero_documento:
+            queryset = queryset.filter(numero_documento__icontains=numero_documento)
         
         # Búsqueda general
         search = self.request.query_params.get('search', None)
         if search:
             queryset = queryset.filter(
                 Q(nombre__icontains=search) |
-                Q(documento__icontains=search) |
+                Q(numero_documento__icontains=search) |
                 Q(email__icontains=search) |
                 Q(telefono__icontains=search)
             )
@@ -137,12 +136,13 @@ class ClienteViewSet(viewsets.ModelViewSet):
         
         try:
             cliente = ClienteService.crear_cliente(
-                nombre=serializer.validated_data['nombre'],
-                documento=serializer.validated_data['documento'],
-                telefono=serializer.validated_data.get('telefono'),
-                email=serializer.validated_data.get('email'),
-                direccion=serializer.validated_data.get('direccion'),
-                estado=serializer.validated_data.get('estado', True)
+                nombre=serializer.validated_data["nombre"],
+                tipo_documento=serializer.validated_data["tipo_documento"],
+                numero_documento=serializer.validated_data["numero_documento"],
+                telefono=serializer.validated_data.get("telefono"),
+                email=serializer.validated_data.get("email"),
+                direccion=serializer.validated_data.get("direccion"),
+                estado=serializer.validated_data.get("estado", True),
             )
             
             response_serializer = ClienteDetailSerializer(cliente)
@@ -167,15 +167,11 @@ class ClienteViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         try:
+            # 🔥 SOLO enviamos los campos que realmente vienen
             cliente = ClienteService.actualizar_cliente(
                 cliente_id=instance.id,
-                nombre=serializer.validated_data.get('nombre'),
-                telefono=serializer.validated_data.get('telefono'),
-                email=serializer.validated_data.get('email'),
-                direccion=serializer.validated_data.get('direccion'),
-                estado=serializer.validated_data.get('estado')
+                **serializer.validated_data
             )
-            
             response_serializer = ClienteDetailSerializer(cliente)
             return Response(
                 {
@@ -287,7 +283,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             data.append({
                 'id': cliente.id,
                 'nombre': cliente.nombre,
-                'documento': cliente.documento,
+                'numero_documento': cliente.documento,
                 'total_compras': cliente.total_compras,
                 'total_gastado': float(cliente.total_gastado) if cliente.total_gastado else 0
             })
@@ -312,7 +308,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             data.append({
                 'id': cliente.id,
                 'nombre': cliente.nombre,
-                'documento': cliente.documento,
+                'numero_documento': cliente.documento,
                 'total_compras': cliente.total_compras,
                 'total_gastado': float(cliente.total_gastado) if cliente.total_gastado else 0
             })

@@ -33,11 +33,10 @@ from apps.ventas.serializers import (
 from apps.ventas.services import VentaService
 
 from apps.usuarios.permissions import (
-    EsAdministrador,
     EsSupervisor,
     EsVendedor,
     PuedeGestionarVentas,
-    PuedeEliminar,
+
 )
 
 

@@ -38,7 +38,8 @@ class ClienteCreateSerializer(serializers.ModelSerializer):
         model = Cliente
         fields = [
             'nombre',
-            'documento',
+            'tipo_documento',
+            'numero_documento',
             'telefono',
             'email',
             'direccion',
@@ -57,7 +58,7 @@ class ClienteCreateSerializer(serializers.ModelSerializer):
             )
         return value.strip()
     
-    def validate_documento(self, value):
+    def validate_numero_documento(self, value):
         """
         Validar documento del cliente
         
@@ -81,7 +82,7 @@ class ClienteCreateSerializer(serializers.ModelSerializer):
             )
         
         # Validar unicidad
-        if Cliente.objects.filter(documento=documento_limpio).exists():
+        if Cliente.objects.filter(numero_documento=documento_limpio).exists():
             raise serializers.ValidationError(
                 "Ya existe un cliente con este documento."
             )
@@ -136,13 +137,14 @@ class ClienteUpdateSerializer(serializers.ModelSerializer):
     
     Nota: El documento no se puede modificar una vez creado
     """
-    documento = serializers.CharField(read_only=True)
+    numero_documento = serializers.CharField(read_only=True)
     
     class Meta:
         model = Cliente
         fields = [
             'nombre',
-            'documento',  # read_only
+            'tipo_documento',
+            'numero_documento',  # read_only
             'telefono',
             'email',
             'direccion',
