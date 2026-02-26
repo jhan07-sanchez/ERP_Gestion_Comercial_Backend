@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
 from apps.clientes.models import Cliente
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 
 class Venta(models.Model):
     ESTADO_CHOICES = [

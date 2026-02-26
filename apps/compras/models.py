@@ -2,7 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.db.models import Sum, F
 from django.utils import timezone
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 from apps.proveedores.models import Proveedor
 
 

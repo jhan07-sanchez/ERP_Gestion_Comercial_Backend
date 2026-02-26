@@ -31,7 +31,9 @@ from django.utils import timezone
 # Importamos los modelos de otras apps
 from apps.ventas.models import Venta, DetalleVenta
 from apps.compras.models import Compra, DetalleCompra
-from apps.inventario.models import Producto, Inventario, Categoria
+from apps.productos.models import Producto
+from apps.categorias.models import Categoria
+from apps.inventario.models import Inventario
 from apps.clientes.models import Cliente
 from apps.caja.models import MovimientoCaja
 

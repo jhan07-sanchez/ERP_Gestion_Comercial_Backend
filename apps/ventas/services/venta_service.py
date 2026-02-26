@@ -18,7 +18,8 @@ from decimal import Decimal
 
 from apps.ventas.models import Venta, DetalleVenta
 from apps.clientes.models import Cliente
-from apps.inventario.models import Producto, Inventario, MovimientoInventario
+from apps.productos.models import Producto
+from apps.inventario.models import Inventario, MovimientoInventario
 
 
 # ============================================================================

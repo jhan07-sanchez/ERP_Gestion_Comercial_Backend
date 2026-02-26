@@ -17,7 +17,7 @@ Fecha: 2026-02-15
 from rest_framework import serializers
 from django.db.models import Sum
 from apps.compras.models import Compra, DetalleCompra
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 from apps.proveedores.serializers import ProveedorSimpleSerializer
 
 

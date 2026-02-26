@@ -19,7 +19,7 @@ from django.db import transaction
 from decimal import Decimal
 
 from apps.compras.models import Compra, DetalleCompra
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 from apps.proveedores.models import Proveedor
 
 

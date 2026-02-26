@@ -55,6 +55,9 @@ LOCAL_APPS = [
     "apps.clientes.apps.ClientesConfig",
     "apps.proveedores.apps.ProveedoresConfig",
     "apps.documentos.apps.DocumentosConfig",
+    # Catálogo
+    "apps.categorias.apps.CategoriasConfig",
+    "apps.productos.apps.ProductosConfig",
     # Operaciones
     "apps.inventario.apps.InventarioConfig",
     "apps.ventas.apps.VentasConfig",

@@ -24,7 +24,8 @@ from decimal import Decimal
 from typing import Dict, List, Optional
 
 from apps.compras.models import Compra, DetalleCompra
-from apps.inventario.models import Producto, Inventario, MovimientoInventario
+from apps.productos.models import Producto
+from apps.inventario.models import Inventario, MovimientoInventario
 from apps.proveedores.models import Proveedor
 
 # Configurar logger

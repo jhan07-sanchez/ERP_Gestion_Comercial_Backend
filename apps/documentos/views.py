@@ -48,7 +48,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.compras.models import Compra
 from apps.ventas.models import Venta
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 
 from .services import (
     generar_pdf_compra,

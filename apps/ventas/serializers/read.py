@@ -14,7 +14,7 @@ Fecha: 2026-01-29
 from rest_framework import serializers
 from apps.ventas.models import Venta, DetalleVenta
 from apps.clientes.models import Cliente
-from apps.inventario.models import Producto
+from apps.productos.models import Producto
 
 
 # ============================================================================
@@ -26,7 +26,7 @@ class ClienteSimpleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Cliente
-        fields = ['id', 'nombre', 'documento', 'telefono', 'email']
+        fields = ['id', 'nombre','tipo_documento', 'numero_documento', 'telefono', 'email']
 
 
 class ProductoSimpleSerializer(serializers.ModelSerializer):
@@ -93,7 +93,7 @@ class VentaListSerializer(serializers.ModelSerializer):
     - Estado con badge
     """
     cliente_nombre = serializers.CharField(source='cliente.nombre', read_only=True)
-    cliente_documento = serializers.CharField(source='cliente.documento', read_only=True)
+    cliente_numero_documento = serializers.CharField(source='cliente.numero_documento', read_only=True)
     usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
     estado_badge = serializers.SerializerMethodField()
     total_productos = serializers.SerializerMethodField()
@@ -104,7 +104,7 @@ class VentaListSerializer(serializers.ModelSerializer):
             'id',
             'cliente',
             'cliente_nombre',
-            'cliente_documento',
+            'cliente_numero_documento',
             'usuario',
             'usuario_nombre',
             'total',
