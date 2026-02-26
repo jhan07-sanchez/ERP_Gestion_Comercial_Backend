@@ -14,12 +14,12 @@ Autor: Sistema ERP
 Versión: 2.0
 Fecha: 2026-02-15
 """
-
+from apps.dashboard.services.actividad_service import ActividadService
+from datetime import datetime
 import logging
 from django.db import transaction
-from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models import Sum, Count, Avg
 from django.utils import timezone
-from django.core.exceptions import ValidationError
 from decimal import Decimal
 from typing import Dict, List, Optional
 
@@ -132,6 +132,11 @@ class CompraService:
                     f"El proveedor {proveedor.nombre} está inactivo."
                 )
 
+            if isinstance(fecha, datetime) is False:
+                fecha = timezone.make_aware(
+                datetime.combine(fecha, datetime.min.time())
+            )
+            
             # 3. Calcular el total y validar productos
             total = Decimal("0.00")
             productos_validados = []
@@ -182,6 +187,15 @@ class CompraService:
                 estado="PENDIENTE",
             )
 
+            # ✅ REGISTRAR ACTIVIDAD CORRECTAMENTE
+            ActividadService.registrar(
+                usuario=usuario,
+                tipo="COMPRA",
+                accion="CREADA",
+                descripcion=f"Compra #{compra.numero_compra} creada",
+                estado="PENDIENTE",
+            )
+
             # 5. Crear los detalles
             for item in productos_validados:
                 DetalleCompra.objects.create(
@@ -190,7 +204,7 @@ class CompraService:
                     cantidad=item["cantidad"],
                     precio_compra=item["precio_compra"],
                 )
-
+            
             logger.info(
                 f"✅ Compra {compra.numero_compra} creada exitosamente. "
                 f"Total: ${total}, Productos: {len(productos_validados)}"

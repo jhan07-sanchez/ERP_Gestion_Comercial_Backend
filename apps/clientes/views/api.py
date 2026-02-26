@@ -34,6 +34,7 @@ from apps.usuarios.permissions import (
     EsVendedor,
 )
 
+from apps.dashboard.services.actividad_service import ActividadService
 
 # ============================================================================
 # VIEWSET DE CLIENTES
@@ -172,6 +173,14 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 cliente_id=instance.id,
                 **serializer.validated_data
             )
+
+            ActividadService.registrar(
+                tipo="CLIENTE",
+                accion="ACTUALIZADO",
+                descripcion=f"Cliente actualizado: {cliente.nombre}",
+                usuario=request.user,
+            )
+            
             response_serializer = ClienteDetailSerializer(cliente)
             return Response(
                 {

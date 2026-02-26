@@ -24,6 +24,7 @@ urlpatterns = [
     path("api/proveedores/", include("apps.proveedores.urls", namespace="proveedores")),
     path("api/documentos/", include("apps.documentos.urls" , namespace="documentos")),
     path("api/dashboard/", include("apps.dashboard.urls", namespace="dashboard")),
+    path("api/configuracion/", include("apps.configuracion.urls", namespace="configuracion")),
 ]
 
 # Servir archivos media en desarrollo
