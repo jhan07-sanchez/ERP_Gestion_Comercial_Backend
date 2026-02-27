@@ -16,7 +16,7 @@ from django.db.models import Sum, Count, F, Q, Avg
 from django.utils import timezone
 from decimal import Decimal
 
-from apps.ventas.models import Venta, DetalleVenta
+from apps.ventas.models import Venta, DetalleVenta, PagoVenta
 from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 from apps.inventario.models import Inventario, MovimientoInventario
@@ -33,13 +33,13 @@ class VentaService:
     @transaction.atomic
     def crear_venta(cliente_id, detalles, usuario, estado='PENDIENTE'):
         """
-        Crear una nueva venta con sus detalles
+        Crear una nueva venta con sus detalles (Sin pago inmediato)
         
         Args:
             cliente_id: ID del cliente
             detalles: Lista de diccionarios con producto_id, cantidad, precio_unitario
             usuario: Usuario que crea la venta
-            estado: Estado inicial de la venta
+            estado: Estado inicial de la venta (generalmente PENDIENTE)
         
         Returns:
             Venta: Instancia de la venta creada
@@ -48,8 +48,7 @@ class VentaService:
             1. Validar cliente
             2. Crear la venta
             3. Crear detalles
-            4. Actualizar inventario
-            5. Registrar movimientos
+            (El inventario NO se descuenta aquí, se descuenta al pagar)
         """
         # 1. Obtener el cliente
         cliente = Cliente.objects.get(id=cliente_id)
@@ -70,7 +69,7 @@ class VentaService:
             estado=estado
         )
         
-        # 4. Crear detalles y actualizar inventario
+        # 4. Crear detalles
         for detalle in detalles:
             producto = Producto.objects.get(id=detalle['producto_id'])
             precio = detalle.get('precio_unitario', producto.precio_venta)
@@ -85,23 +84,72 @@ class VentaService:
                 precio_unitario=precio,
                 subtotal=subtotal
             )
+        
+        return venta
+    
+    @staticmethod
+    @transaction.atomic
+    def registrar_pago(venta_id, monto, metodo_pago, usuario, monto_recibido=0, vuelto=0, referencia=None):
+        """
+        Registra un pago parcial o total para una venta.
+        Actualiza el estado de la venta y descuenta el inventario si es el primer pago.
+        
+        Returns:
+            PagoVenta: Instancia del pago creado.
+        """
+        venta = Venta.objects.prefetch_related('detalles__producto').get(id=venta_id)
+        
+        if venta.estado == 'CANCELADA':
+            raise ValueError('No se pueden registrar pagos a una venta cancelada.')
             
-            # Reducir inventario (solo si la venta está completada)
-            if estado == 'COMPLETADA':
-                inventario = Inventario.objects.get(producto=producto)
-                inventario.stock_actual -= cantidad
+        pagos_previos = venta.pagos.aggregate(total=Sum('monto'))['total'] or Decimal('0.00')
+        saldo_pendiente = venta.total - Decimal(str(pagos_previos))
+        monto_decimal = Decimal(str(monto))
+        
+        if monto_decimal <= 0:
+            raise ValueError('El monto debe ser mayor a 0.')
+            
+        if monto_decimal > saldo_pendiente:
+            raise ValueError(f'El monto excede el saldo pendiente. Saldo actual: {saldo_pendiente}')
+            
+        # 1. Registrar el pago
+        pago = PagoVenta.objects.create(
+            venta=venta,
+            monto=monto_decimal,
+            metodo_pago=metodo_pago,
+            monto_recibido=monto_recibido,
+            vuelto=vuelto,
+            referencia=referencia,
+            usuario=usuario
+        )
+        
+        # 2. Verificar y descontar inventario si es el PRIMER pago (venta pasa de PENDIENTE a PARCIAL o COMPLETADA)
+        # O si el método de pago es CRÉDITO (entrega inmediata)
+        if venta.estado == 'PENDIENTE':
+            for detalle in venta.detalles.all():
+                inventario = Inventario.objects.get(producto=detalle.producto)
+                inventario.stock_actual -= detalle.cantidad
                 inventario.save()
                 
-                # Registrar movimiento de inventario
                 MovimientoInventario.objects.create(
-                    producto=producto,
+                    producto=detalle.producto,
                     tipo_movimiento='SALIDA',
-                    cantidad=cantidad,
-                    referencia=f'VENTA-{venta.id}',
+                    cantidad=detalle.cantidad,
+                    referencia=f'VENTA-{venta.id} (Primer Pago)',
                     usuario=usuario
                 )
         
-        return venta
+        # 3. Recalcular y actualizar estado de la venta
+        nuevo_total_pagado = pagos_previos + monto_decimal
+        
+        if nuevo_total_pagado >= venta.total:
+            venta.estado = 'COMPLETADA'
+        else:
+            venta.estado = 'PARCIAL'
+            
+        venta.save()
+        
+        return pago
     
     @staticmethod
     @transaction.atomic

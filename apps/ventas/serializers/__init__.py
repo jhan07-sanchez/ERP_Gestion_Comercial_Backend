@@ -19,6 +19,9 @@ from .read import (
     VentaListSerializer,
     VentaDetailSerializer,
     VentaSimpleSerializer,
+    
+    # Pago de Venta
+    PagoVentaReadSerializer,
 )
 
 from .write import (
@@ -30,6 +33,9 @@ from .write import (
     VentaUpdateSerializer,
     VentaCancelarSerializer,
     VentaCompletarSerializer,
+    
+    # Pago de Venta
+    PagoVentaCreateSerializer,
 )
 
 __all__ = [
@@ -44,6 +50,7 @@ __all__ = [
     'VentaListSerializer',
     'VentaDetailSerializer',
     'VentaSimpleSerializer',
+    'PagoVentaReadSerializer',
     
     # WRITE - Detalle de Venta
     'DetalleVentaWriteSerializer',
@@ -53,4 +60,5 @@ __all__ = [
     'VentaUpdateSerializer',
     'VentaCancelarSerializer',
     'VentaCompletarSerializer',
+    'PagoVentaCreateSerializer',
 ]

@@ -28,7 +28,6 @@ from apps.productos.serializers import (
 from apps.categorias.services import CategoriaService
 
 from apps.usuarios.permissions import (
-    EsAdministrador,
     EsSupervisor,
     EsAlmacenista,
     PuedeGestionarInventario,
@@ -109,6 +108,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
             categoria = CategoriaService.crear_categoria(
                 nombre=serializer.validated_data["nombre"],
                 descripcion=serializer.validated_data.get("descripcion"),
+                estado=serializer.validated_data.get("estado", True),
             )
 
             response_serializer = CategoriaReadSerializer(categoria)
@@ -128,6 +128,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
                 categoria_id=instance.id,
                 nombre=serializer.validated_data.get("nombre"),
                 descripcion=serializer.validated_data.get("descripcion"),
+                estado=serializer.validated_data.get("estado"),
             )
 
             response_serializer = CategoriaReadSerializer(categoria)

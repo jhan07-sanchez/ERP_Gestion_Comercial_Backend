@@ -24,11 +24,11 @@ from apps.ventas.serializers import (
     VentaListSerializer,
     VentaDetailSerializer,
     DetalleVentaReadSerializer,
-    # Write
     VentaCreateSerializer,
     VentaUpdateSerializer,
     VentaCancelarSerializer,
     VentaCompletarSerializer,
+    PagoVentaCreateSerializer,
 )
 from apps.ventas.services import VentaService
 
@@ -258,6 +258,53 @@ class VentaViewSet(viewsets.ModelViewSet):
                     'detail': 'Venta completada exitosamente',
                     'venta': response_serializer.data
                 }
+            )
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'], url_path='pagos')
+    def registrar_pago(self, request, pk=None):
+        """
+        Registra un pago para una venta.
+        
+        POST /api/ventas/{id}/pagos/
+        Body: PagoVentaCreateSerializer
+        """
+        venta = self.get_object()
+        serializer = PagoVentaCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            pago = VentaService.registrar_pago(
+                venta_id=venta.id,
+                monto=serializer.validated_data['monto'],
+                metodo_pago=serializer.validated_data['metodo_pago'],
+                usuario=request.user,
+                monto_recibido=serializer.validated_data.get('monto_recibido', 0),
+                vuelto=serializer.validated_data.get('vuelto', 0),
+                referencia=serializer.validated_data.get('referencia', None)
+            )
+
+            # Volver a cargar la venta para devolver el detalle actualizado
+            from apps.ventas.models import Venta
+            venta_actualizada = Venta.objects.select_related('cliente', 'usuario').prefetch_related('detalles__producto', 'pagos').get(id=venta.id)
+            response_serializer = VentaDetailSerializer(venta_actualizada)
+            
+            return Response(
+                {
+                    'detail': 'Pago registrado exitosamente',
+                    'venta': response_serializer.data,
+                    'pago_id': pago.id
+                },
+                status=status.HTTP_201_CREATED
             )
         except ValueError as e:
             return Response(

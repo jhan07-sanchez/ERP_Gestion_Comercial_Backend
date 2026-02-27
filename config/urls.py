@@ -16,7 +16,7 @@ urlpatterns = [
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     # API Endpoints
-    path("api/usuarios/", include("apps.usuarios.urls", namespace="usuarios")),
+    path("api/", include("apps.usuarios.urls", namespace="usuarios")),
     path("api/categorias/", include("apps.categorias.urls", namespace="categorias")),
     path("api/productos/", include("apps.productos.urls", namespace="productos")),
     path("api/inventario/", include("apps.inventario.urls", namespace="inventario")),

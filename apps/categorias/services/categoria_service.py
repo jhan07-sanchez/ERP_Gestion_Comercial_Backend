@@ -18,7 +18,7 @@ class CategoriaService:
     """Servicio para manejar la lógica de negocio de Categorías"""
 
     @staticmethod
-    def crear_categoria(nombre, descripcion=None):
+    def crear_categoria(nombre, descripcion=None, estado=True):
         """
         Crear una nueva categoría
 
@@ -31,12 +31,13 @@ class CategoriaService:
         """
         categoria = Categoria.objects.create(
             nombre=nombre.strip().title(),
-            descripcion=descripcion.strip() if descripcion else None
+            descripcion=descripcion.strip() if descripcion else None,
+            estado=estado
         )
         return categoria
 
     @staticmethod
-    def actualizar_categoria(categoria_id, nombre=None, descripcion=None):
+    def actualizar_categoria(categoria_id, nombre=None, descripcion=None, estado=None):
         """
         Actualizar una categoría existente
 
@@ -44,6 +45,7 @@ class CategoriaService:
             categoria_id: ID de la categoría
             nombre: Nuevo nombre (opcional)
             descripcion: Nueva descripción (opcional)
+            estado: Nuevo estado (opcional)
 
         Returns:
             Categoria: Instancia de la categoría actualizada
@@ -55,6 +57,9 @@ class CategoriaService:
 
         if descripcion is not None:
             categoria.descripcion = descripcion.strip() if descripcion else None
+
+        if estado is not None:
+            categoria.estado = estado
 
         categoria.save()
         return categoria

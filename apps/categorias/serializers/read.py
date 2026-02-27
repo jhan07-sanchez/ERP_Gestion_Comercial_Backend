@@ -43,6 +43,7 @@ class CategoriaReadSerializer(serializers.ModelSerializer):
             'id',
             'nombre',
             'descripcion',
+            'estado',
             'total_productos',
             'productos_activos',
             'fecha_creacion',

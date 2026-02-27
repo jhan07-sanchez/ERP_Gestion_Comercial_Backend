@@ -34,7 +34,8 @@ class CategoriaWriteSerializer(serializers.ModelSerializer):
         model = Categoria
         fields = [
             'nombre',
-            'descripcion'
+            'descripcion',
+            'estado'
         ]
 
     def validate_nombre(self, value):

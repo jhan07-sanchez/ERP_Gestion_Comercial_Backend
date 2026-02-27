@@ -13,7 +13,7 @@ Fecha: 2026-01-29
 
 from rest_framework import serializers
 from django.db import transaction
-from apps.ventas.models import Venta, DetalleVenta
+from apps.ventas.models import Venta, DetalleVenta, PagoVenta
 from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 from apps.inventario.models import Inventario
@@ -110,6 +110,30 @@ class DetalleVentaWriteSerializer(serializers.Serializer):
 
 
 # ============================================================================
+# SERIALIZERS DE PAGO DE VENTA (WRITE)
+# ============================================================================
+
+class PagoVentaCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer para REGISTRAR un nuevo pago a una venta.
+    Validaremos en el servicio que el monto no exceda el saldo pendiente.
+    """
+    class Meta:
+        model = PagoVenta
+        fields = [
+            'monto', 
+            'metodo_pago', 
+            'monto_recibido', 
+            'vuelto', 
+            'referencia'
+        ]
+        
+    def validate_monto(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("El monto del pago debe ser mayor a 0.")
+        return value
+
+# ============================================================================
 # SERIALIZERS DE VENTA (WRITE)
 # ============================================================================
 
@@ -129,7 +153,7 @@ class VentaCreateSerializer(serializers.Serializer):
     cliente_id = serializers.IntegerField()
     detalles = DetalleVentaWriteSerializer(many=True)
     estado = serializers.ChoiceField(
-        choices=['PENDIENTE', 'COMPLETADA'],
+        choices=['PENDIENTE', 'PARCIAL', 'COMPLETADA'],
         default='PENDIENTE',
         required=False
     )
@@ -186,6 +210,7 @@ class VentaCreateSerializer(serializers.Serializer):
             )
             for detalle in detalles
         )
+        
         
         data['total'] = total
         

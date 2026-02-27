@@ -12,7 +12,8 @@ Fecha: 2026-01-29
 """
 
 from rest_framework import serializers
-from apps.ventas.models import Venta, DetalleVenta
+from django.db.models import Sum
+from apps.ventas.models import Venta, DetalleVenta, PagoVenta
 from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 
@@ -76,6 +77,31 @@ class DetalleVentaReadSerializer(serializers.ModelSerializer):
 
 
 # ============================================================================
+# SERIALIZERS DE PAGOS (READ)
+# ============================================================================
+
+class PagoVentaReadSerializer(serializers.ModelSerializer):
+    """
+    Serializer de lectura para Pagos de Venta
+    """
+    usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
+    metodo_pago_display = serializers.CharField(source='get_metodo_pago_display', read_only=True)
+
+    class Meta:
+        model = PagoVenta
+        fields = [
+            'id',
+            'monto',
+            'metodo_pago',
+            'metodo_pago_display',
+            'monto_recibido',
+            'vuelto',
+            'referencia',
+            'fecha',
+            'usuario_nombre'
+        ]
+
+# ============================================================================
 # SERIALIZERS DE VENTA (READ)
 # ============================================================================
 
@@ -97,6 +123,8 @@ class VentaListSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source='usuario.username', read_only=True)
     estado_badge = serializers.SerializerMethodField()
     total_productos = serializers.SerializerMethodField()
+    total_pagado = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
 
     class Meta:
         model = Venta
@@ -108,6 +136,8 @@ class VentaListSerializer(serializers.ModelSerializer):
             'usuario',
             'usuario_nombre',
             'total',
+            'total_pagado',
+            'saldo_pendiente',
             'estado',
             'estado_badge',
             'total_productos',
@@ -127,6 +157,12 @@ class VentaListSerializer(serializers.ModelSerializer):
                 'color': 'orange',
                 'icono': '⏳',
                 'clase': 'badge-warning'
+            },
+            'PARCIAL': {
+                'texto': 'PARCIAL',
+                'color': 'blue',
+                'icono': '◐',
+                'clase': 'badge-info'
             },
             'COMPLETADA': {
                 'texto': 'COMPLETADA',
@@ -148,6 +184,14 @@ class VentaListSerializer(serializers.ModelSerializer):
             'icono': '?',
             'clase': 'badge-secondary'
         })
+
+    def get_total_pagado(self, obj):
+        pagos = obj.pagos.aggregate(total=Sum('monto'))['total']
+        return pagos or 0
+
+    def get_saldo_pendiente(self, obj):
+        pagos = self.get_total_pagado(obj)
+        return max(float(obj.total) - float(pagos), 0)
 
     def get_total_productos(self, obj):
         """Obtener total de productos diferentes en la venta"""
@@ -182,6 +226,11 @@ class VentaDetailSerializer(serializers.ModelSerializer):
 
     # Detalles
     detalles = DetalleVentaReadSerializer(many=True, read_only=True)
+    
+    # Pagos
+    pagos = PagoVentaReadSerializer(many=True, read_only=True)
+    total_pagado = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
 
     # Estadísticas
     total_productos = serializers.SerializerMethodField()
@@ -198,10 +247,13 @@ class VentaDetailSerializer(serializers.ModelSerializer):
             'usuario_nombre',
             'usuario_email',
             'total',
+            'total_pagado',
+            'saldo_pendiente',
             'estado',
             'estado_display',
             'estado_badge',
             'detalles',
+            'pagos',
             'total_productos',
             'total_unidades',
             'fecha'
@@ -215,6 +267,12 @@ class VentaDetailSerializer(serializers.ModelSerializer):
                 'color': 'orange',
                 'icono': '⏳',
                 'clase': 'badge-warning'
+            },
+            'PARCIAL': {
+                'texto': 'PARCIAL',
+                'color': 'blue',
+                'icono': '◐',
+                'clase': 'badge-info'
             },
             'COMPLETADA': {
                 'texto': 'COMPLETADA',
@@ -236,6 +294,14 @@ class VentaDetailSerializer(serializers.ModelSerializer):
             'icono': '?',
             'clase': 'badge-secondary'
         })
+
+    def get_total_pagado(self, obj):
+        pagos = obj.pagos.aggregate(total=Sum('monto'))['total']
+        return pagos or 0
+
+    def get_saldo_pendiente(self, obj):
+        pagos = self.get_total_pagado(obj)
+        return max(float(obj.total) - float(pagos), 0)
 
     def get_total_productos(self, obj):
         """Obtener total de productos diferentes"""
