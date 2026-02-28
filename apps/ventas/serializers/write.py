@@ -224,13 +224,49 @@ class VentaUpdateSerializer(serializers.ModelSerializer):
     Usado en:
     - PUT/PATCH /api/ventas/{id}/
     
-    Nota: Solo se puede actualizar el estado.
-    Los detalles NO se pueden modificar una vez creados.
+    Permite actualizar:
+    - Cliente
+    - Detalles (productos, cantidades, precios)
+    - Estado
     """
+    cliente_id = serializers.IntegerField(required=False)
+    detalles = DetalleVentaWriteSerializer(many=True, required=False)
     
     class Meta:
         model = Venta
-        fields = ['estado']
+        fields = ['cliente_id', 'detalles', 'estado']
+    
+    def update(self, instance, validated_data):
+        """
+        Sobrescribir update para usar el servicio y manejar detalles anidados
+        """
+        from apps.ventas.services import VentaService
+        
+        # Si se proporcionan detalles o cliente, usar el servicio para la actualización completa
+        if 'detalles' in validated_data or 'cliente_id' in validated_data:
+            cliente_id = validated_data.get('cliente_id', instance.cliente.id)
+            detalles = validated_data.get('detalles', [])
+            
+            # Si no se pasaron detalles, pero sí cliente u otro campo, 
+            # y el serializer se usa en PATCH parcial, debemos decidir qué hacer.
+            # En este caso, si llega la llave 'detalles' vacía o presente, actualizamos.
+            
+            venta = VentaService.actualizar_venta(
+                venta_id=instance.id,
+                cliente_id=cliente_id,
+                detalles=detalles,
+                usuario=self.context['request'].user
+            )
+            
+            # El estado se puede actualizar también
+            if 'estado' in validated_data:
+                venta.estado = validated_data['estado']
+                venta.save()
+                
+            return venta
+            
+        # Si solo se actualiza el estado (comportamiento original)
+        return super().update(instance, validated_data)
     
     def validate_estado(self, value):
         """

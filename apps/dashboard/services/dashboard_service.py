@@ -691,8 +691,8 @@ class DashboardService:
             )[:20]
         )
 
-        # Productos con stock bajo (stock <= mínimo pero > 0)
-        stock_bajo = (
+        # Productos con stock bajo (crítico: 0 < stock <= mínimo)
+        stock_critico = (
             Inventario.objects.filter(
                 stock_actual__gt=0,
                 stock_actual__lte=F("producto__stock_minimo"),
@@ -705,7 +705,25 @@ class DashboardService:
                 "producto__codigo",
                 "stock_actual",
                 "producto__stock_minimo",
-            )[:20]
+            )[:15]  # Limitado a 15 para no saturar
+        )
+
+        # Productos próximos a stock mínimo (advertencia: mínimo < stock <= mínimo * 1.5)
+        # O si el stock_minimo es 0, un valor de seguridad como 5
+        stock_advertencia = (
+            Inventario.objects.filter(
+                stock_actual__gt=F("producto__stock_minimo"),
+                stock_actual__lte=F("producto__stock_minimo") * 1.5,
+                producto__estado=True,
+            )
+            .select_related("producto")
+            .values(
+                "producto__id",
+                "producto__nombre",
+                "producto__codigo",
+                "stock_actual",
+                "producto__stock_minimo",
+            )[:10]
         )
 
         # Ventas pendientes hace más de 24 horas
@@ -717,7 +735,7 @@ class DashboardService:
         )
 
         total_alertas = (
-            sin_stock.count() + stock_bajo.count() + ventas_pendientes.count()
+            sin_stock.count() + stock_critico.count() + stock_advertencia.count() + ventas_pendientes.count()
         )
 
         return {
@@ -731,27 +749,44 @@ class DashboardService:
                     "tipo": "SIN_STOCK",
                     "severidad": "critica",
                     "mensaje": f"Sin stock: {a['producto__nombre']}",
+                    "timestamp": timezone.now().isoformat()
                 }
                 for a in sin_stock
             ],
-            "stock_bajo": [
+            "stock_critico": [
                 {
                     "producto_id": a["producto__id"],
                     "nombre": a["producto__nombre"],
                     "codigo": a["producto__codigo"],
                     "stock_actual": a["stock_actual"],
                     "stock_minimo": a["producto__stock_minimo"],
-                    "tipo": "STOCK_BAJO",
-                    "severidad": "advertencia",
-                    "mensaje": f"Stock bajo: {a['producto__nombre']} ({a['stock_actual']} unidades)",
+                    "tipo": "STOCK_CRITICO",
+                    "severidad": "critica",
+                    "mensaje": f"Stock crítico: {a['producto__nombre']} ({a['stock_actual']} unidades)",
+                    "timestamp": timezone.now().isoformat()
                 }
-                for a in stock_bajo
+                for a in stock_critico
+            ],
+            "stock_advertencia": [
+                {
+                    "producto_id": a["producto__id"],
+                    "nombre": a["producto__nombre"],
+                    "codigo": a["producto__codigo"],
+                    "stock_actual": a["stock_actual"],
+                    "stock_minimo": a["producto__stock_minimo"],
+                    "tipo": "STOCK_ADVERTENCIA",
+                    "severidad": "advertencia",
+                    "mensaje": f"Próximo a stock mínimo: {a['producto__nombre']} ({a['stock_actual']} unidades)",
+                    "timestamp": timezone.now().isoformat()
+                }
+                for a in stock_advertencia
             ],
             "ventas_pendientes": [
                 {
                     "venta_id": v["id"],
                     "total": float(v["total"] or 0),
                     "fecha": v["fecha"].isoformat(),
+                    "timestamp": v["fecha"].isoformat(),
                     "tipo": "VENTA_PENDIENTE",
                     "severidad": "informacion",
                     "mensaje": f"Venta #{v['id']} lleva más de 24h pendiente",

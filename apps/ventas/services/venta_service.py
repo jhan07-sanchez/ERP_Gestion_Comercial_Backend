@@ -89,6 +89,64 @@ class VentaService:
     
     @staticmethod
     @transaction.atomic
+    def actualizar_venta(venta_id, cliente_id, detalles, usuario):
+        """
+        Actualizar una venta existente y sus detalles
+        
+        Args:
+            venta_id: ID de la venta a actualizar
+            cliente_id: Nuevo ID del cliente
+            detalles: Nueva lista de detalles (producto_id, cantidad, precio_unitario)
+            usuario: Usuario que realiza la actualización
+            
+        Proceso:
+            1. Validar que la venta esté PENDIENTE
+            2. Actualizar cliente
+            3. Eliminar detalles anteriores
+            4. Crear nuevos detalles
+            5. Recalcular total
+        """
+        venta = Venta.objects.get(id=venta_id)
+        
+        # 1. Validar estado (Solo se editan ventas PENDIENTES)
+        if venta.estado != 'PENDIENTE':
+            raise ValueError(
+                f'Solo se pueden editar ventas en estado PENDIENTE. '
+                f'Estado actual: {venta.estado}'
+            )
+            
+        # 2. Actualizar cliente
+        cliente = Cliente.objects.get(id=cliente_id)
+        venta.cliente = cliente
+        
+        # 3. Eliminar detalles anteriores y volver a crear
+        venta.detalles.all().delete()
+        
+        # 4. Crear nuevos detalles y calcular total
+        total = Decimal('0.00')
+        for det in detalles:
+            producto = Producto.objects.get(id=det['producto_id'])
+            precio = det.get('precio_unitario', producto.precio_venta)
+            cantidad = det['cantidad']
+            subtotal = Decimal(str(precio)) * Decimal(str(cantidad))
+            total += subtotal
+            
+            DetalleVenta.objects.create(
+                venta=venta,
+                producto=producto,
+                cantidad=cantidad,
+                precio_unitario=precio,
+                subtotal=subtotal
+            )
+            
+        # 5. Actualizar total y guardar
+        venta.total = total
+        venta.save()
+        
+        return venta
+
+    @staticmethod
+    @transaction.atomic
     def registrar_pago(venta_id, monto, metodo_pago, usuario, monto_recibido=0, vuelto=0, referencia=None):
         """
         Registra un pago parcial o total para una venta.
