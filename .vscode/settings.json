@@ -1,15 +1,22 @@
 {
     "cSpell.words": [
         "accion",
+        "categorias",
+        "configuracion",
         "CONFIGURACION",
+        "corsheaders",
         "CREDITO",
+        "dashboar",
         "descripcion",
         "despues",
         "dias",
+        "dotenv",
         "duracion",
         "estadisticas",
         "Estadisticas",
         "filterset",
+        "hpskh",
+        "ksbrko",
         "loguear",
         "metodo",
         "METODO",
@@ -21,8 +28,10 @@
         "polimórficas",
         "serializables",
         "serializar",
+        "simplejwt",
         "viewsets",
         "Yape",
-        "YAPE"
+        "YAPE",
+        "zhkd"
     ]
 }

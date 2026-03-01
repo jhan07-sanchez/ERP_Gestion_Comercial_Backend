@@ -72,7 +72,7 @@ class LogAuditoriaAdmin(admin.ModelAdmin):
     list_per_page = 50
 
     # Campos de solo lectura
-    readonly_fields = "__all__"
+    #readonly_fields = "__all__"
 
     def has_add_permission(self, request):
         """No permitir crear logs manualmente desde el admin."""
@@ -123,8 +123,8 @@ class LogAuditoriaAdmin(admin.ModelAdmin):
 
     exitoso_display.short_description = "OK"
 
-    def get_readonly_fields(self, request, obj=None):
-        """Todos los campos son de solo lectura."""
-        if obj:
-            return [f.name for f in obj._meta.fields]
-        return []
+    #def get_readonly_fields(self, request, obj=None):
+        #"""Todos los campos son de solo lectura."""
+        #if obj:
+           # return [f.name for f in obj._meta.fields]
+        #return []
