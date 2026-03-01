@@ -16,6 +16,15 @@ from apps.clientes.models import Cliente
 import re
 
 
+# Mapeo label -> clave para aceptar ambos formatos desde el frontend
+LABEL_TO_TIPO_DOCUMENTO = {
+    "Cédula de ciudadanía": Cliente.TipoDocumento.CEDULA,
+    "Cédula de ciudadania": Cliente.TipoDocumento.CEDULA,
+    "Cédula extranjera": Cliente.TipoDocumento.CEDULA_EXTRANJERA,
+    "NIT": Cliente.TipoDocumento.NIT,
+}
+
+
 # ============================================================================
 # SERIALIZERS DE CLIENTE (WRITE)
 # ============================================================================
@@ -57,6 +66,21 @@ class ClienteCreateSerializer(serializers.ModelSerializer):
                 "El nombre no puede tener más de 200 caracteres."
             )
         return value.strip()
+
+    def validate_tipo_documento(self, value):
+        """Normalizar tipo_documento: aceptar clave (CEDULA) o etiqueta (Cédula de ciudadanía)"""
+        if not value:
+            return Cliente.TipoDocumento.CEDULA
+        valor = value.strip()
+        # Si ya es una clave válida
+        if valor in (Cliente.TipoDocumento.CEDULA, Cliente.TipoDocumento.NIT, Cliente.TipoDocumento.CEDULA_EXTRANJERA):
+            return valor
+        # Si es una etiqueta, mapear a clave
+        if valor in LABEL_TO_TIPO_DOCUMENTO:
+            return LABEL_TO_TIPO_DOCUMENTO[valor]
+        raise serializers.ValidationError(
+            f'"{valor}" no es una elección válida. Use: CEDULA, NIT o CEDULA_EXTRANJERA.'
+        )
     
     def validate_numero_documento(self, value):
         """
@@ -162,6 +186,19 @@ class ClienteUpdateSerializer(serializers.ModelSerializer):
                 "El nombre no puede tener más de 200 caracteres."
             )
         return value.strip()
+
+    def validate_tipo_documento(self, value):
+        """Normalizar tipo_documento: aceptar clave (CEDULA) o etiqueta (Cédula de ciudadanía)"""
+        if not value:
+            return Cliente.TipoDocumento.CEDULA
+        valor = value.strip()
+        if valor in (Cliente.TipoDocumento.CEDULA, Cliente.TipoDocumento.NIT, Cliente.TipoDocumento.CEDULA_EXTRANJERA):
+            return valor
+        if valor in LABEL_TO_TIPO_DOCUMENTO:
+            return LABEL_TO_TIPO_DOCUMENTO[valor]
+        raise serializers.ValidationError(
+            f'"{valor}" no es una elección válida. Use: CEDULA, NIT o CEDULA_EXTRANJERA.'
+        )
     
     def validate_telefono(self, value):
         """Validar teléfono"""
