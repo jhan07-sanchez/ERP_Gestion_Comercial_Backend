@@ -1,10 +1,27 @@
 {
     "cSpell.words": [
+        "accion",
+        "CONFIGURACION",
         "CREDITO",
+        "descripcion",
+        "despues",
+        "dias",
+        "duracion",
+        "estadisticas",
+        "Estadisticas",
+        "filterset",
+        "loguear",
         "metodo",
         "METODO",
+        "metodos",
+        "milisegundos",
+        "nginx",
         "Plin",
         "PLIN",
+        "polimórficas",
+        "serializables",
+        "serializar",
+        "viewsets",
         "Yape",
         "YAPE"
     ]
