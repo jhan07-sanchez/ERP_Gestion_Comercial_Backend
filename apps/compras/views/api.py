@@ -24,6 +24,9 @@ from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q, Sum
 from django_filters.rest_framework import DjangoFilterBackend
 import logging
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
+from apps.auditorias.utils import snapshot_objeto
 
 from apps.compras.models import Compra, DetalleCompra
 from apps.compras.serializers import (
@@ -89,7 +92,7 @@ class CompraPagination(PageNumberPagination):
 # ============================================================================
 
 
-class CompraViewSet(viewsets.ModelViewSet):
+class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet completo para gestión de compras
 
@@ -147,6 +150,46 @@ class CompraViewSet(viewsets.ModelViewSet):
         elif self.action == "anular":
             return CompraAnularSerializer
         return CompraDetailSerializer
+
+    modulo_auditoria = 'COMPRAS'
+
+    def create(self, request, *args, **kwargs):
+        """Crear compra usando el servicio"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            compra = CompraService.crear_compra(
+                proveedor_id=serializer.validated_data['proveedor_id'],
+                detalles=serializer.validated_data['detalles'],
+                usuario=request.user,
+                estado=serializer.validated_data.get('estado', 'PENDIENTE')
+            )
+
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=compra,
+                descripcion=f"Compra creada: ID {compra.id} - Proveedor: {compra.proveedor.nombre}",
+                request=request,
+                datos_despues=snapshot_objeto(compra)
+            )
+
+            response_serializer = CompraDetailSerializer(compra)
+            return Response(
+                {
+                    'detail': 'Compra creada exitosamente',
+                    'compra': response_serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     def get_permissions(self):
         """Permisos según la acción"""

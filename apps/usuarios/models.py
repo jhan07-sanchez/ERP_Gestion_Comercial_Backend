@@ -56,6 +56,14 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
+    def get_full_name(self):
+        """Retorna el nombre completo o el username si no tiene."""
+        return self.username
+
+    def get_short_name(self):
+        """Retorna el nombre corto o el username."""
+        return self.username
+
 
 class UsuarioRol(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='usuario_roles')

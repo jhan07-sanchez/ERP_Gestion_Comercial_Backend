@@ -17,6 +17,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, F
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
+from apps.auditorias.utils import snapshot_objeto
 
 from apps.inventario.models import Inventario, MovimientoInventario
 
@@ -112,9 +115,10 @@ class InventarioViewSet(viewsets.ReadOnlyModelViewSet):
 # ============================================================================
 
 
-class MovimientoInventarioViewSet(viewsets.ModelViewSet):
+class MovimientoInventarioViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar movimientos de inventario
+
 
     Endpoints:
     - list: GET /api/inventario/movimientos/
@@ -132,9 +136,11 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
     """
 
     queryset = MovimientoInventario.objects.select_related("producto", "usuario")
+    modulo_auditoria = "INVENTARIO"
     serializer_class = MovimientoInventarioReadSerializer
     permission_classes = [IsAuthenticated, PuedeGestionarInventario]
     http_method_names = ["get", "post", "head", "options"]  # Solo GET y POST
+
 
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -204,6 +210,18 @@ class MovimientoInventarioViewSet(viewsets.ModelViewSet):
                 )
 
             response_serializer = MovimientoInventarioReadSerializer(movimiento)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=movimiento,
+                descripcion=f"Movimiento de inventario registrado: {tipo} - {producto_id} - Cantidad: {cantidad}",
+                request=request,
+                datos_despues=snapshot_objeto(movimiento)
+            )
+
             return Response(
                 {
                     "detail": "Movimiento registrado exitosamente",

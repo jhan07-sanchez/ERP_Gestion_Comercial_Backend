@@ -6,13 +6,14 @@ from django.conf.urls.static import static
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 
 # Importar la vista personalizada
-from apps.usuarios.serializers.jwt import CustomTokenObtainPairView
+from apps.usuarios.serializers.jwt import CustomTokenObtainPairView, CustomLogoutView
 
 urlpatterns = [
     # Django Admin
     path("admin/", admin.site.urls),
     # JWT Authentication (Con vista personalizada)
     path("api/token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/logout/", CustomLogoutView.as_view(), name="token_logout"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     # API Endpoints

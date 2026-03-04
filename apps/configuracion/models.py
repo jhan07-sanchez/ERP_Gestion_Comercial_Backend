@@ -187,6 +187,14 @@ class ConfiguracionGeneral(models.Model):
         help_text="Número de decimales para mostrar precios (0-4)",
     )
 
+    tasa_cambio = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        default=1.0000,
+        verbose_name="Tasa de cambio",
+        help_text="Tasa de conversión respecto a la moneda base (ej: 1 USD = 4000 COP)",
+    )
+
     # ── Numeración de Documentos ──────────────────────────────────────────────
     # Estos campos controlan el consecutivo automático de cada tipo de documento
 

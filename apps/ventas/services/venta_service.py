@@ -16,15 +16,7 @@ from django.db.models import Sum, Count, F, Q, Avg
 from django.utils import timezone
 from decimal import Decimal
 
-from apps.ventas.models import Venta, DetalleVenta, PagoVenta
-from apps.clientes.models import Cliente
-from apps.productos.models import Producto
-from apps.inventario.models import Inventario, MovimientoInventario
-
-
-# ============================================================================
-# SERVICIO DE VENTAS
-# ============================================================================
+from apps.configuracion.services.configuracion_service import ConfiguracionService
 
 class VentaService:
     """Servicio para manejar la lógica de negocio de Ventas"""
@@ -33,50 +25,50 @@ class VentaService:
     @transaction.atomic
     def crear_venta(cliente_id, detalles, usuario, estado='PENDIENTE'):
         """
-        Crear una nueva venta con sus detalles (Sin pago inmediato)
-        
-        Args:
-            cliente_id: ID del cliente
-            detalles: Lista de diccionarios con producto_id, cantidad, precio_unitario
-            usuario: Usuario que crea la venta
-            estado: Estado inicial de la venta (generalmente PENDIENTE)
-        
-        Returns:
-            Venta: Instancia de la venta creada
-        
-        Proceso:
-            1. Validar cliente
-            2. Crear la venta
-            3. Crear detalles
-            (El inventario NO se descuenta aquí, se descuenta al pagar)
+        Crear una nueva venta con sus detalles gobernada por la configuración global.
         """
+        # 0. Obtener configuración central
+        config = ConfiguracionService.obtener_configuracion()
+        
         # 1. Obtener el cliente
         cliente = Cliente.objects.get(id=cliente_id)
         
-        # 2. Calcular el total
-        total = Decimal('0.00')
+        # 2. Calcular totales con base en impuestos globales
+        total_base = Decimal('0.00')
         for detalle in detalles:
             producto = Producto.objects.get(id=detalle['producto_id'])
-            precio = detalle.get('precio_unitario', producto.precio_venta)
-            cantidad = detalle['cantidad']
-            total += Decimal(str(precio)) * Decimal(str(cantidad))
+            cantidad = Decimal(str(detalle['cantidad']))
+            
+            # Validación de Stock (Regla de Negocio Centralizada)
+            if not config.permitir_venta_sin_stock:
+                inventario = Inventario.objects.get(producto=producto)
+                if inventario.stock_actual < cantidad:
+                    raise ValueError(f"Stock insuficiente para {producto.nombre}. Disponible: {inventario.stock_actual}")
+            
+            precio = Decimal(str(detalle.get('precio_unitario', producto.precio_venta)))
+            total_base += precio * cantidad
+        
+        # Aplicar impuesto global
+        porcentaje_iva = config.impuesto_porcentaje if config.aplicar_impuesto_por_defecto else Decimal('0.00')
+        impuesto = total_base * (porcentaje_iva / 100)
+        total_venta = total_base + impuesto
         
         # 3. Crear la venta
         venta = Venta.objects.create(
             cliente=cliente,
             usuario=usuario,
-            total=total,
+            total=total_venta,
+            impuesto=impuesto,
             estado=estado
         )
         
         # 4. Crear detalles
         for detalle in detalles:
             producto = Producto.objects.get(id=detalle['producto_id'])
-            precio = detalle.get('precio_unitario', producto.precio_venta)
-            cantidad = detalle['cantidad']
-            subtotal = Decimal(str(precio)) * Decimal(str(cantidad))
+            precio = Decimal(str(detalle.get('precio_unitario', producto.precio_venta)))
+            cantidad = Decimal(str(detalle['cantidad']))
+            subtotal = precio * cantidad
             
-            # Crear detalle
             DetalleVenta.objects.create(
                 venta=venta,
                 producto=producto,

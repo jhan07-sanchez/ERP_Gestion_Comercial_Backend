@@ -16,6 +16,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
 
 from apps.proveedores.models import Proveedor
 from apps.proveedores.serializers import (
@@ -41,9 +43,10 @@ from apps.usuarios.permissions import (
 # VIEWSET DE PROVEEDORES
 # ============================================================================
 
-class ProveedorViewSet(viewsets.ModelViewSet):
+class ProveedorViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar proveedores
+
     
     Endpoints:
     - list: GET /api/proveedores/
@@ -68,7 +71,9 @@ class ProveedorViewSet(viewsets.ModelViewSet):
     - Estadísticas: Supervisor o Admin
     """
     queryset = Proveedor.objects.all()
+    modulo_auditoria = 'PROVEEDORES'
     
+
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
         if self.action == 'list':
@@ -147,6 +152,17 @@ class ProveedorViewSet(viewsets.ModelViewSet):
             )
             
             response_serializer = ProveedorDetailSerializer(proveedor)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=proveedor,
+                descripcion=f"Proveedor creado: {proveedor.nombre}",
+                request=request
+            )
+
             return Response(
                 {
                     'detail': 'Proveedor creado exitosamente',
@@ -176,7 +192,18 @@ class ProveedorViewSet(viewsets.ModelViewSet):
                 direccion=serializer.validated_data.get('direccion'),
                 estado=serializer.validated_data.get('estado')
             )
-            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=proveedor,
+                descripcion=f"Proveedor actualizado: {proveedor.nombre}",
+                request=request,
+                datos_antes=self.snapshot_objeto(instance),
+                datos_despues=self.snapshot_objeto(proveedor)
+            )
+
             response_serializer = ProveedorDetailSerializer(proveedor)
             return Response(
                 {

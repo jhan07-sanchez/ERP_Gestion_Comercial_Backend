@@ -20,96 +20,67 @@ Autor: Sistema ERP
 
 from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.cache import cache
 from apps.configuracion.models import ConfiguracionGeneral
+
+CACHE_KEY = "global_config_singleton"
+CACHE_TIMEOUT = 3600 * 24  # 24 horas
 
 
 class ConfiguracionService:
     """
     Servicio para manejar la lógica de negocio de la Configuración General.
-
-    Todos los métodos son @staticmethod porque no necesitan estado propio:
-    solo reciben datos, hacen su trabajo y retornan resultados.
+    Implementa caché para optimizar el rendimiento del ERP.
     """
 
     @staticmethod
-    def obtener_configuracion():
+    def limpiar_cache():
+        """Elimina la configuración del caché global."""
+        cache.delete(CACHE_KEY)
+
+    @staticmethod
+    def obtener_configuracion() -> ConfiguracionGeneral:
         """
-        Obtiene la configuración general del sistema.
-
-        Usa el método .obtener() del modelo que implementa el patrón Singleton.
-        Si no existe configuración, la crea con valores por defecto.
-
-        Retorna:
-            ConfiguracionGeneral: La instancia única de configuración.
-
-        Uso:
-            config = ConfiguracionService.obtener_configuracion()
+        Obtiene la configuración general del sistema con soporte de caché.
         """
-        return ConfiguracionGeneral.obtener()
+        config = cache.get(CACHE_KEY)
+        if not config:
+            config = ConfiguracionGeneral.obtener()
+            cache.set(CACHE_KEY, config, CACHE_TIMEOUT)
+        return config
+
+    @staticmethod
+    def get_valor(campo: str, fallback=None):
+        """
+        Retorna el valor de un parámetro específico con fallback seguro.
+        Útil para consultas rápidas desde otros módulos.
+        """
+        config = ConfiguracionService.obtener_configuracion()
+        return getattr(config, campo, fallback)
 
     @staticmethod
     @transaction.atomic
     def actualizar_configuracion(datos_validados: dict) -> ConfiguracionGeneral:
         """
-        Actualiza la configuración general con los datos proporcionados.
-
-        @transaction.atomic significa que si algo falla en el proceso,
-        todos los cambios se revierten (rollback). Esto protege la integridad
-        de los datos.
-
-        Args:
-            datos_validados (dict): Datos ya validados por el serializer.
-                                    No pasar datos sin validar aquí.
-
-        Retorna:
-            ConfiguracionGeneral: La instancia actualizada.
-
-        Proceso:
-            1. Obtiene la configuración actual (la crea si no existe)
-            2. Actualiza cada campo con los datos nuevos
-            3. Guarda y retorna
+        Actualiza la configuración e invalida el caché.
         """
         config = ConfiguracionGeneral.obtener()
 
-        # Actualizar cada campo que venga en los datos
-        # setattr(objeto, 'campo', valor) es equivalente a objeto.campo = valor
-        # pero funciona de forma dinámica con cualquier nombre de campo
         for campo, valor in datos_validados.items():
             setattr(config, campo, valor)
 
         config.save()
+        ConfiguracionService.limpiar_cache()
         return config
 
     @staticmethod
     @transaction.atomic
     def reset_consecutivo(tipo: str, nuevo_consecutivo: int) -> ConfiguracionGeneral:
         """
-        Resetea o ajusta el consecutivo de un tipo de documento.
-
-        ⚠️ ACCIÓN CRÍTICA: Cambiar un consecutivo puede causar documentos
-        con números duplicados. Solo debe hacerlo el Administrador.
-
-        ¿Por qué select_for_update()?
-        - En sistemas concurrentes (múltiples usuarios), dos personas
-          podrían intentar cambiar el consecutivo al mismo tiempo.
-        - select_for_update() bloquea el registro hasta que la transacción
-          termine, evitando condiciones de carrera.
-
-        Args:
-            tipo (str): Tipo de documento. Valores: "factura", "compra", "recibo"
-            nuevo_consecutivo (int): El nuevo valor del consecutivo (≥ 1)
-
-        Retorna:
-            ConfiguracionGeneral: La instancia actualizada.
-
-        Raises:
-            ValueError: Si el tipo no es válido.
+        Resetea un consecutivo e invalida el caché.
         """
-        # Bloquear el registro para escritura exclusiva
         config = ConfiguracionGeneral.objects.select_for_update().get(pk=1)
 
-        # Mapa de tipos a campos del modelo
-        # Esto es más limpio que un if/elif por cada tipo
         campo_mapa = {
             "factura": "consecutivo_factura",
             "compra": "consecutivo_compra",
@@ -117,63 +88,39 @@ class ConfiguracionService:
         }
 
         if tipo not in campo_mapa:
-            raise ValueError(
-                f"Tipo de documento no válido: '{tipo}'. "
-                f"Valores permitidos: {list(campo_mapa.keys())}"
-            )
+            raise ValueError(f"Tipo no válido: '{tipo}'")
 
         campo = campo_mapa[tipo]
         setattr(config, campo, nuevo_consecutivo)
         config.save(update_fields=[campo])
 
+        ConfiguracionService.limpiar_cache()
         return config
 
     @staticmethod
     def obtener_info_empresa() -> dict:
-        """
-        Retorna un diccionario con la información de la empresa.
-
-        Útil para:
-        - Generación de PDFs (facturas, recibos, reportes)
-        - Mostrar datos en el encabezado de la aplicación
-        - Cualquier contexto que necesite los datos de la empresa
-
-        Retorna:
-            dict: Diccionario con los datos de la empresa
-        """
-        config = ConfiguracionGeneral.obtener()
+        """Retorna info básica desde el caché."""
+        config = ConfiguracionService.obtener_configuracion()
         return config.get_info_empresa()
 
     @staticmethod
     def generar_numero_factura() -> str:
-        """
-        Genera el próximo número de factura.
-
-        ¿Por qué está en el servicio y no directamente en el modelo?
-        - Porque en el futuro podríamos querer registrar cada generación
-          en un log, o notificar a alguien, sin cambiar el modelo.
-        - El servicio es el lugar correcto para orquestar estas acciones.
-
-        Retorna:
-            str: El número de factura generado (ej: "FAC-0005")
-        """
+        """Genera número y limpia caché para reflejar nuevo consecutivo."""
         config = ConfiguracionGeneral.objects.select_for_update().get(pk=1)
-        return config.generar_numero_factura()
+        numero = config.generar_numero_factura()
+        ConfiguracionService.limpiar_cache()
+        return numero
 
     @staticmethod
     def generar_numero_compra() -> str:
-        """
-        Genera el próximo número de compra.
-        Retorna str como "COM-0003"
-        """
         config = ConfiguracionGeneral.objects.select_for_update().get(pk=1)
-        return config.generar_numero_compra()
+        numero = config.generar_numero_compra()
+        ConfiguracionService.limpiar_cache()
+        return numero
 
     @staticmethod
     def generar_numero_recibo() -> str:
-        """
-        Genera el próximo número de recibo POS.
-        Retorna str como "REC-0012"
-        """
         config = ConfiguracionGeneral.objects.select_for_update().get(pk=1)
-        return config.generar_numero_recibo()
+        numero = config.generar_numero_recibo()
+        ConfiguracionService.limpiar_cache()
+        return numero

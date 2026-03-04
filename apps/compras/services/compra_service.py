@@ -14,7 +14,7 @@ Autor: Sistema ERP
 Versión: 2.0
 Fecha: 2026-02-15
 """
-from apps.dashboard.services.actividad_service import ActividadService
+from apps.auditorias.services.auditoria_service import AuditoriaService
 from datetime import datetime
 import logging
 from django.db import transaction
@@ -188,13 +188,14 @@ class CompraService:
                 estado="PENDIENTE",
             )
 
-            # ✅ REGISTRAR ACTIVIDAD CORRECTAMENTE
-            ActividadService.registrar(
+            # ✅ REGISTRAR AUDITORÍA CORRECTAMENTE
+            AuditoriaService.registrar_accion(
                 usuario=usuario,
-                tipo="COMPRA",
-                accion="CREADA",
+                accion='CREAR',
+                modulo='COMPRAS',
+                objeto=compra,
                 descripcion=f"Compra #{compra.numero_compra} creada",
-                estado="PENDIENTE",
+                request=request if 'request' in locals() else None,
             )
 
             # 5. Crear los detalles
@@ -288,13 +289,14 @@ class CompraService:
                     f"+{detalle.cantidad} (Total: {inventario.stock_actual})"
                 )
 
-            # 4. Cambiar estado
-            compra.estado = "REALIZADA"
-            compra.save()
-
-            logger.info(
-                f"✅ Compra {compra.numero_compra} confirmada exitosamente. "
-                f"Productos actualizados: {compra.detalles.count()}"
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=usuario,
+                accion='ACTUALIZAR',
+                modulo='COMPRAS',
+                objeto=compra,
+                descripcion=f"Compra confirmada: {compra.numero_compra}",
+                request=None # No hay request en el contexto del servicio directo
             )
 
             return compra
@@ -395,14 +397,14 @@ class CompraService:
                         f"-{detalle.cantidad} (Total: {inventario.stock_actual})"
                     )
 
-            # 4. Cambiar estado y guardar motivo
-            compra.estado = "ANULADA"
-            compra.motivo_anulacion = motivo
-            compra.save()
-
-            logger.info(
-                f"✅ Compra {compra.numero_compra} anulada exitosamente. "
-                f"Motivo: {motivo}"
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=usuario,
+                accion='ELIMINAR', # Usamos ELIMINAR para anulación
+                modulo='COMPRAS',
+                objeto=compra,
+                descripcion=f"Compra anulada: {compra.numero_compra}. Motivo: {motivo}",
+                request=None
             )
 
             return compra

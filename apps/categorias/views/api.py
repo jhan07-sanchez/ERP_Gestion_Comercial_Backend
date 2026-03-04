@@ -13,6 +13,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
 
 from apps.categorias.models import Categoria
 
@@ -40,9 +42,10 @@ from apps.usuarios.permissions import (
 # ============================================================================
 
 
-class CategoriaViewSet(viewsets.ModelViewSet):
+class CategoriaViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar categorías de productos
+
 
     Endpoints:
     - list: GET /api/categorias/
@@ -61,6 +64,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Categoria.objects.prefetch_related("productos")
+    modulo_auditoria = 'INVENTARIO'
 
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -112,6 +116,17 @@ class CategoriaViewSet(viewsets.ModelViewSet):
             )
 
             response_serializer = CategoriaReadSerializer(categoria)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=categoria,
+                descripcion=f"Categoría creada: {categoria.nombre}",
+                request=request
+            )
+
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -129,6 +144,17 @@ class CategoriaViewSet(viewsets.ModelViewSet):
                 nombre=serializer.validated_data.get("nombre"),
                 descripcion=serializer.validated_data.get("descripcion"),
                 estado=serializer.validated_data.get("estado"),
+            )
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=categoria,
+                descripcion=f"Categoría actualizada: {categoria.nombre}",
+                request=request,
+                datos_antes=self.snapshot_objeto(instance),
+                datos_despues=self.snapshot_objeto(categoria)
             )
 
             response_serializer = CategoriaReadSerializer(categoria)

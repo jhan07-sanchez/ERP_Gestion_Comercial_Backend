@@ -1,0 +1,2 @@
+Accion: CREAR | Modulo: COMPRAS | Desc: Compra #COMP-00016 creada
+Accion: ACTUALIZAR | Modulo: COMPRAS | Desc: Compra confirmada: COMP-00016

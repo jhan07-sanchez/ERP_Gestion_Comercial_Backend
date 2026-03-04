@@ -13,6 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, F
+from apps.auditorias.mixins import MixinAuditable
 
 from apps.productos.models import Producto
 
@@ -49,7 +50,11 @@ from apps.usuarios.permissions import (
 # ============================================================================
 
 
-class ProductoViewSet(viewsets.ModelViewSet):
+class ProductoViewSet(MixinAuditable, viewsets.ModelViewSet):
+    """
+    ViewSet para gestionar productos
+    """
+    modulo_auditoria = "INVENTARIO"
     """
     ViewSet para gestionar productos
 
@@ -157,33 +162,31 @@ class ProductoViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """Crear producto usando el servicio"""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            producto = ProductoService.crear_producto(**serializer.validated_data)
-
-            response_serializer = ProductoDetailSerializer(producto)
-            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # Nota: MixinAuditable intercepta perform_create
+        return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
         """Actualizar producto usando el servicio"""
-        partial = kwargs.pop("partial", False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+        # Nota: MixinAuditable intercepta perform_update
+        return super().update(request, *args, **kwargs)
 
-        try:
-            producto = ProductoService.actualizar_producto(
-                producto_id=instance.id, **serializer.validated_data
-            )
+    def perform_create(self, serializer):
+        """Sobrescribimos para usar el servicio pero mantener auditoría"""
+        producto = ProductoService.crear_producto(**serializer.validated_data)
+        # Sincronizamos el serializer con el objeto creado
+        serializer.instance = producto
+        # Llamamos al super para que el Mixin haga el log
+        super().perform_create(serializer)
 
-            response_serializer = ProductoDetailSerializer(producto)
-            return Response(response_serializer.data)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    def perform_update(self, serializer):
+        """Sobrescribimos para usar el servicio pero mantener auditoría"""
+        producto = ProductoService.actualizar_producto(
+            producto_id=self.get_object().id, **serializer.validated_data
+        )
+        # Sincronizamos el serializer
+        serializer.instance = producto
+        # Llamamos al super para que el Mixin haga el log
+        super().perform_update(serializer)
 
     @action(detail=False, methods=["get"])
     def stock_bajo(self, request):

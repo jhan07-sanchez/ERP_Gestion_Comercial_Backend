@@ -46,6 +46,7 @@ from apps.configuracion.serializers import (
     ResetConsecutivoSerializer,
 )
 from apps.usuarios.permissions import EsAdministrador
+from apps.auditorias.services.auditoria_service import AuditoriaService
 
 
 # ============================================================================
@@ -136,6 +137,16 @@ class ConfiguracionView(APIView):
             serializer.validated_data
         )
 
+        # Auditoría
+        AuditoriaService.registrar_accion(
+            usuario=request.user,
+            accion='ACTUALIZAR',
+            modulo='SISTEMA',
+            objeto=config_actualizada,
+            descripcion="Configuración general actualizada (Sincronización completa)",
+            request=request
+        )
+
         # Respondemos con el serializer de LECTURA (no el de escritura)
         # para que el frontend reciba todos los datos enriquecidos
         response_serializer = ConfiguracionReadSerializer(
@@ -168,6 +179,16 @@ class ConfiguracionView(APIView):
 
         config_actualizada = ConfiguracionService.actualizar_configuracion(
             serializer.validated_data
+        )
+
+        # Auditoría
+        AuditoriaService.registrar_accion(
+            usuario=request.user,
+            accion='ACTUALIZAR',
+            modulo='SISTEMA',
+            objeto=config_actualizada,
+            descripcion="Configuración general actualizada (Cambios parciales)",
+            request=request
         )
 
         response_serializer = ConfiguracionReadSerializer(
@@ -218,6 +239,16 @@ class ResetConsecutivoView(APIView):
 
         try:
             config = ConfiguracionService.reset_consecutivo(tipo, nuevo_consecutivo)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo='SISTEMA',
+                objeto=config,
+                descripcion=f"Reinicio de consecutivo: {tipo} a {nuevo_consecutivo}",
+                request=request
+            )
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

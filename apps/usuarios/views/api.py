@@ -4,6 +4,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
+from apps.auditorias.utils import snapshot_objeto
 
 from apps.usuarios.models import Usuario, Rol
 from apps.usuarios.serializers import (
@@ -22,20 +25,13 @@ from apps.usuarios.serializers import (
 from apps.usuarios.services import UsuarioService, RolService
 
 
-class RolViewSet(viewsets.ModelViewSet):
+class RolViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar roles
-
-    list: GET /api/roles/ - Listar todos los roles
-    create: POST /api/roles/ - Crear un nuevo rol
-    retrieve: GET /api/roles/{id}/ - Obtener detalle de un rol
-    update: PUT /api/roles/{id}/ - Actualizar un rol completo
-    partial_update: PATCH /api/roles/{id}/ - Actualizar parcialmente un rol
-    destroy: DELETE /api/roles/{id}/ - Eliminar un rol
-    usuarios: GET /api/roles/{id}/usuarios/ - Obtener usuarios con este rol
     """
     queryset = Rol.objects.all()
     permission_classes = [IsAuthenticated]
+    modulo_auditoria = 'USUARIOS'
 
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -78,6 +74,18 @@ class RolViewSet(viewsets.ModelViewSet):
             )
 
             response_serializer = RolReadSerializer(rol)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=rol,
+                descripcion=f"Rol creado: {rol.nombre}",
+                request=request,
+                datos_despues=snapshot_objeto(rol)
+            )
+
             return Response(
                 response_serializer.data,
                 status=status.HTTP_201_CREATED
@@ -100,6 +108,18 @@ class RolViewSet(viewsets.ModelViewSet):
                 rol_id=instance.id,
                 nombre=serializer.validated_data.get('nombre'),
                 descripcion=serializer.validated_data.get('descripcion')
+            )
+
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=rol,
+                descripcion=f"Rol actualizado: {rol.nombre}",
+                request=request,
+                datos_antes=snapshot_objeto(instance),
+                datos_despues=snapshot_objeto(rol)
             )
 
             response_serializer = RolReadSerializer(rol)
@@ -154,26 +174,13 @@ class RolViewSet(viewsets.ModelViewSet):
         })
 
 
-class UsuarioViewSet(viewsets.ModelViewSet):
+class UsuarioViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar usuarios
-
-    list: GET /api/usuarios/ - Listar todos los usuarios
-    create: POST /api/usuarios/ - Crear un nuevo usuario
-    retrieve: GET /api/usuarios/{id}/ - Obtener detalle de un usuario
-    update: PUT /api/usuarios/{id}/ - Actualizar un usuario completo
-    partial_update: PATCH /api/usuarios/{id}/ - Actualizar parcialmente un usuario
-    destroy: DELETE /api/usuarios/{id}/ - Eliminar un usuario
-    me: GET /api/usuarios/me/ - Obtener información del usuario autenticado
-    change_password: POST /api/usuarios/{id}/change_password/ - Cambiar contraseña
-    activate: POST /api/usuarios/{id}/activate/ - Activar usuario
-    deactivate: POST /api/usuarios/{id}/deactivate/ - Desactivar usuario
-    estadisticas: GET /api/usuarios/{id}/estadisticas/ - Obtener estadísticas
-    asignar_rol: POST /api/usuarios/{id}/asignar_rol/ - Asignar un rol
-    remover_rol: POST /api/usuarios/{id}/remover_rol/ - Remover un rol
     """
     queryset = Usuario.objects.all()
     permission_classes = [IsAuthenticated]
+    modulo_auditoria = 'USUARIOS'
 
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -253,6 +260,17 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 roles_ids=serializer.validated_data.get('roles_ids', [])
             )
 
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user if request.user.is_authenticated else None,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Usuario creado: {usuario.username} ({usuario.email})",
+                request=request,
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             response_serializer = UsuarioDetailSerializer(usuario)
             return Response(
                 response_serializer.data,
@@ -280,6 +298,18 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 roles_ids=serializer.validated_data.get('roles_ids')
             )
 
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Usuario actualizado: {usuario.username}",
+                request=request,
+                datos_antes=snapshot_objeto(instance),
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             response_serializer = UsuarioDetailSerializer(usuario)
             return Response(response_serializer.data)
         except Exception as e:
@@ -294,7 +324,21 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 
         # No eliminar físicamente, solo desactivar
         try:
+            datos_antes = snapshot_objeto(instance)
             UsuarioService.desactivar_usuario(instance.id)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ELIMINAR', # Se registra como eliminar por ser el método destroy
+                modulo=self.modulo_auditoria,
+                objeto=instance,
+                descripcion=f"Usuario desactivado vía destroy: {instance.username}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(instance)
+            )
+
             return Response(
                 {'detail': 'Usuario desactivado exitosamente.'},
                 status=status.HTTP_204_NO_CONTENT
@@ -348,6 +392,17 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                     old_password=serializer.validated_data['old_password'],
                     new_password=serializer.validated_data['new_password']
                 )
+
+                # Auditoría
+                AuditoriaService.registrar_accion(
+                    usuario=request.user,
+                    accion='ACTUALIZAR',
+                    modulo='SISTEMA',
+                    objeto=usuario,
+                    descripcion=f"Contraseña cambiada para el usuario: {usuario.username}",
+                    request=request
+                )
+
                 return Response(
                     {'detail': 'Contraseña cambiada exitosamente.'},
                     status=status.HTTP_200_OK
@@ -368,7 +423,22 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         POST /api/usuarios/{id}/activate/
         """
         try:
+            instance = Usuario.objects.get(pk=pk)
+            datos_antes = snapshot_objeto(instance)
             usuario = UsuarioService.activar_usuario(pk)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Usuario activado: {usuario.username}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             return Response(
                 {
                     'detail': f'Usuario {usuario.username} activado exitosamente.',
@@ -395,7 +465,22 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         POST /api/usuarios/{id}/deactivate/
         """
         try:
+            instance = Usuario.objects.get(pk=pk)
+            datos_antes = snapshot_objeto(instance)
             usuario = UsuarioService.desactivar_usuario(pk)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Usuario desactivado: {usuario.username}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             return Response(
                 {
                     'detail': f'Usuario {usuario.username} desactivado exitosamente.',
@@ -454,7 +539,22 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             )
 
         try:
+            instance = Usuario.objects.get(pk=pk)
+            datos_antes = snapshot_objeto(instance)
             usuario = UsuarioService.asignar_rol(pk, rol_id)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Rol asignado a usuario {usuario.username}. ID Rol: {rol_id}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             return Response(
                 {
                     'detail': 'Rol asignado exitosamente.',
@@ -497,7 +597,22 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             )
 
         try:
+            instance = Usuario.objects.get(pk=pk)
+            datos_antes = snapshot_objeto(instance)
             usuario = UsuarioService.remover_rol(pk, rol_id)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=usuario,
+                descripcion=f"Rol removido de usuario {usuario.username}. ID Rol: {rol_id}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(usuario)
+            )
+
             return Response(
                 {
                     'detail': 'Rol removido exitosamente.',

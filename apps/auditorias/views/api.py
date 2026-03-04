@@ -274,12 +274,16 @@ class EstadisticasAuditoriaView(APIView):
             ).count()
 
             # Errores y seguridad hoy
+            # Alertas del sistema: Incluye WARNING, ERROR y CRITICAL
             errores_hoy = LogAuditoria.objects.filter(
-                fecha_hora__date=hoy, nivel="ERROR"
+                fecha_hora__date=hoy, 
+                nivel__in=["WARNING", "ERROR", "CRITICAL"]
             ).count()
 
+            # Control de Acceso: Incluye accesos denegados e intentos de login fallidos
             accesos_denegados = LogAuditoria.objects.filter(
-                fecha_hora__date=hoy, accion="ACCESO_DENEGADO"
+                Q(fecha_hora__date=hoy),
+                Q(accion="ACCESO_DENEGADO") | Q(accion="LOGIN_FALLIDO")
             ).count()
 
             logins_fallidos = LogAuditoria.objects.filter(

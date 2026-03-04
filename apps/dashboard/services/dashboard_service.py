@@ -16,7 +16,7 @@ Consulta datos de: Ventas, Compras, Inventario, Caja y Clientes.
 Autor: Sistema ERP
 Versión: 1.0
 """
-from apps.dashboard.models import ActividadSistema
+from apps.auditorias.models import LogAuditoria
 from datetime import timedelta, datetime
 from django.db.models import (
     Sum,
@@ -800,116 +800,44 @@ class DashboardService:
     # ========================================================================
 
     @staticmethod
-    def obtener_actividad_reciente(limite=10):
+    def obtener_actividad_reciente(limite=15):
+        """
+        Obtiene las últimas acciones registradas en el sistema
+        usando el nuevo Centro de Auditoría Unificado.
+        """
+        logs = (
+            LogAuditoria.objects
+            .select_related("usuario")
+            .order_by("-fecha_hora")[:limite]
+        )
 
         actividades = []
+        for log in logs:
+            # Determinar color e icono según módulo/acción
+            color = "gray"
+            icono = "activity"
+            
+            if log.accion in ['CREAR', 'LOGIN']: color = "green"
+            elif log.accion in ['ELIMINAR', 'CANCELAR', 'LOGIN_FALLIDO']: color = "red"
+            elif log.accion in ['ACTUALIZAR']: color = "blue"
+            
+            if log.modulo == 'VENTAS': icono = "shopping-cart"
+            elif log.modulo == 'COMPRAS': icono = "package"
+            elif log.modulo == 'USUARIOS': icono = "user"
+            elif log.modulo == 'INVENTARIO': icono = "database"
+            elif log.modulo == 'CAJA': icono = "dollar-sign"
 
-        # ==============================
-        # ACTIVIDAD DEL SISTEMA
-        # ==============================
-        sistema = (
-        ActividadSistema.objects
-            .select_related("usuario")
-            .order_by("-fecha")[:limite]
-        )
-
-        for a in sistema:
-            actividades.append(
-                {
-                    "tipo": a.tipo,
-                    "accion": a.accion,
-                    "descripcion": a.descripcion,
-                    "usuario": a.usuario.username if a.usuario else "-",
-                    "estado": a.estado,
-                    "fecha": a.fecha,
-                    "icono": "activity",
-                    "color": "gray",
-                }
-            )
-
-        # ==============================
-        # VENTAS
-        # ==============================
-        ventas = (
-            Venta.objects
-            .select_related("cliente", "usuario")
-            .order_by("-fecha")[:limite]
-        )
-
-        for v in ventas:
             actividades.append({
-                "tipo": "VENTA",
-                "descripcion": f"Venta #{v.id} a {v.cliente.nombre}",
-                "usuario": v.usuario.username if v.usuario else "-",
-                "monto": float(v.total),
-                "estado": v.estado,
-                "fecha": v.fecha,
-                "icono": "shopping-cart",
-                "color": "green" if v.estado == "COMPLETADA" else "gray",
+                "id": log.id,
+                "type": log.get_modulo_display().upper(),
+                "accion": log.get_accion_display(),
+                "descripcion": log.descripcion,
+                "usuario": log.usuario_nombre or "-",
+                "timestamp": log.fecha_hora.isoformat(),
+                "fecha": log.fecha_hora.isoformat(),
+                "icono": icono,
+                "color": color,
+                "estado": "success" if log.exitoso else "error"
             })
 
-        # ==============================
-        # COMPRAS
-        # ==============================
-        compras = Compra.objects.select_related("usuario").order_by("-fecha")[:limite]
-
-        for c in compras:
-            actividades.append({
-                "tipo": "COMPRA",
-                "descripcion": f"Compra #{c.id}",
-                "usuario": c.usuario.username if c.usuario else "-",
-                "monto": float(c.total),
-                "estado": c.estado,
-                "fecha": c.fecha,
-                "icono": "package",
-                "color": "blue",
-            })
-
-        # ==============================
-        # CLIENTES
-        # ==============================
-        clientes = Cliente.objects.order_by("-fecha_creacion")[:limite]
-
-        for c in clientes:
-            actividades.append(
-                {
-                    "tipo": "CLIENTE",
-                    "descripcion": f"Nuevo cliente: {c.nombre}",
-                    "usuario": "-",
-                    "estado": a.estado,
-                    "fecha": c.fecha_creacion,
-                    "icono": "user",
-                    "color": "purple",
-                }
-            )
-
-        # ==============================
-        # CAJA
-        # ==============================
-        movimientos = MovimientoCaja.objects.order_by("-fecha")[:limite]
-
-        for m in movimientos:
-            actividades.append(
-                {
-                    "tipo": "CAJA",
-                    "descripcion": f"Movimiento: {m.tipo}",
-                    "usuario": "-",
-                    "monto": float(m.monto),
-                    "estado": a.estado,
-                    "fecha": m.fecha,
-                    "icono": "dollar-sign",
-                    "color": "green" if m.tipo == "INGRESO" else "red",
-                }
-            )
-
-        # ==============================
-        # ORDENAR TODO POR FECHA
-        # ==============================
-
-        actividades.sort(key=lambda x: x["fecha"], reverse=True)
-
-        # convertir fecha a ISO
-        for a in actividades:
-            a["fecha"] = a["fecha"].isoformat()
-
-        return actividades[:limite]
+        return actividades

@@ -17,6 +17,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q, Sum
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
+from apps.auditorias.utils import snapshot_objeto
 
 from apps.ventas.models import Venta, DetalleVenta
 from apps.ventas.serializers import (
@@ -44,9 +47,10 @@ from apps.usuarios.permissions import (
 # VIEWSET DE VENTAS
 # ============================================================================
 
-class VentaViewSet(viewsets.ModelViewSet):
+class VentaViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar ventas
+
 
     Endpoints:
     - list: GET /api/ventas/
@@ -71,6 +75,7 @@ class VentaViewSet(viewsets.ModelViewSet):
     - Completar: Vendedor o superior
     """
     queryset = Venta.objects.select_related('cliente', 'usuario').prefetch_related('detalles')
+    modulo_auditoria = 'VENTAS'
 
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -173,6 +178,18 @@ class VentaViewSet(viewsets.ModelViewSet):
             )
 
             response_serializer = VentaDetailSerializer(venta)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=venta,
+                descripcion=f"Venta creada: ID {venta.id} - Cliente: {venta.cliente.nombre}",
+                request=request,
+                datos_despues=snapshot_objeto(venta)
+            )
+
             return Response(
                 {
                     'detail': 'Venta creada exitosamente',
@@ -194,7 +211,21 @@ class VentaViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         try:
+            datos_antes = snapshot_objeto(instance)
             serializer.save()
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=instance,
+                descripcion=f"Venta actualizada: ID {instance.id}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(instance) # After save
+            )
+            
             response_serializer = VentaDetailSerializer(instance)
             return Response(
                 {
@@ -246,10 +277,23 @@ class VentaViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         try:
+            datos_antes = snapshot_objeto(venta)
             venta_completada = VentaService.completar_venta(
                 venta_id=venta.id,
                 usuario=request.user,
                 notas=serializer.validated_data.get('notas')
+            )
+
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='COMPLETAR',
+                modulo=self.modulo_auditoria,
+                objeto=venta_completada,
+                descripcion=f"Venta completada: ID {venta_completada.id}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(venta_completada)
             )
 
             response_serializer = VentaDetailSerializer(venta_completada)
@@ -296,6 +340,18 @@ class VentaViewSet(viewsets.ModelViewSet):
             # Volver a cargar la venta para devolver el detalle actualizado
             from apps.ventas.models import Venta
             venta_actualizada = Venta.objects.select_related('cliente', 'usuario').prefetch_related('detalles__producto', 'pagos').get(id=venta.id)
+            
+            # Auditoría de Pago
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='PAGO_REGISTRADO', # Using more specific action
+                modulo='CAJA', 
+                objeto=pago,
+                descripcion=f"Pago de Venta registrado: ID Venta {venta.id} - Monto: {pago.monto}",
+                request=request,
+                datos_despues=snapshot_objeto(pago)
+            )
+            
             response_serializer = VentaDetailSerializer(venta_actualizada)
             
             return Response(
@@ -332,10 +388,23 @@ class VentaViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         try:
+            datos_antes = snapshot_objeto(venta)
             venta_cancelada = VentaService.cancelar_venta(
                 venta_id=venta.id,
                 usuario=request.user,
-                motivo=serializer.validated_data['motivo']
+                motivo=serializer.validated_data.get('motivo')
+            )
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CANCELAR',
+                modulo=self.modulo_auditoria,
+                objeto=venta_cancelada,
+                descripcion=f"Venta cancelada: ID {venta_cancelada.id} - Motivo: {serializer.validated_data['motivo']}",
+                request=request,
+                datos_antes=datos_antes,
+                datos_despues=snapshot_objeto(venta_cancelada)
             )
 
             response_serializer = VentaDetailSerializer(venta_cancelada)

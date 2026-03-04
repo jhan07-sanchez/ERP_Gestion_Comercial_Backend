@@ -45,6 +45,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from apps.auditorias.services.auditoria_service import AuditoriaService
 
 from apps.compras.models import Compra
 from apps.ventas.models import Venta
@@ -152,6 +153,17 @@ class CompraDocumentoView(APIView):
 
         try:
             pdf_buffer = generar_pdf_compra(compra, empresa)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='DESCARGAR',
+                modulo='DOCUMENTOS',
+                objeto=compra,
+                descripcion=f"PDF de Compra generado: {compra.numero_compra}",
+                request=request
+            )
+
             logger.info(
                 f"✅ PDF Compra {compra.numero_compra} generado por {request.user}"
             )
@@ -207,6 +219,17 @@ class VentaFacturaView(APIView):
             pdf_buffer = generar_pdf_factura(venta, empresa)
             numero = getattr(venta, "numero_venta", f"VT{venta.id:05d}")
             prefijo = empresa.get("prefijo_factura", "FV")
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='DESCARGAR',
+                modulo='DOCUMENTOS',
+                objeto=venta,
+                descripcion=f"Factura de Venta generada: {prefijo}{numero}",
+                request=request
+            )
+
             logger.info(f"✅ Factura {prefijo}{numero} generada por {request.user}")
             return _response_pdf(pdf_buffer, filename=f"factura_{prefijo}{numero}.pdf")
 
@@ -303,6 +326,16 @@ class ReporteVentasView(APIView):
             pdf_buffer = generar_reporte_ventas(
                 ventas_qs, empresa, fecha_inicio, fecha_fin
             )
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='DESCARGAR',
+                modulo='REPORTES',
+                descripcion=f"Reporte de Ventas generado: {fecha_inicio} a {fecha_fin}",
+                request=request
+            )
+
             return _response_pdf(
                 pdf_buffer, filename=f"reporte_ventas_{fecha_inicio}_{fecha_fin}.pdf"
             )

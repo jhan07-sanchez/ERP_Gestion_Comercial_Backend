@@ -16,6 +16,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from apps.auditorias.mixins import MixinAuditable
+from apps.auditorias.services.auditoria_service import AuditoriaService
 
 from apps.clientes.models import Cliente
 from apps.clientes.serializers import (
@@ -34,39 +36,17 @@ from apps.usuarios.permissions import (
     EsVendedor,
 )
 
-from apps.dashboard.services.actividad_service import ActividadService
 
 # ============================================================================
 # VIEWSET DE CLIENTES
 # ============================================================================
 
-class ClienteViewSet(viewsets.ModelViewSet):
+class ClienteViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
     ViewSet para gestionar clientes
-    
-    Endpoints:
-    - list: GET /api/clientes/
-    - create: POST /api/clientes/
-    - retrieve: GET /api/clientes/{id}/
-    - update: PUT /api/clientes/{id}/
-    - partial_update: PATCH /api/clientes/{id}/
-    - destroy: DELETE /api/clientes/{id}/
-    - activar: POST /api/clientes/{id}/activar/
-    - desactivar: POST /api/clientes/{id}/desactivar/
-    - estadisticas: GET /api/clientes/{id}/estadisticas/
-    - frecuentes: GET /api/clientes/frecuentes/
-    - mejores: GET /api/clientes/mejores/
-    - inactivos: GET /api/clientes/inactivos/
-    - buscar: GET /api/clientes/buscar/
-    
-    Permisos:
-    - Listar/Ver: Vendedor o superior
-    - Crear/Actualizar: Vendedor o superior
-    - Eliminar: Solo Supervisor o Admin
-    - Activar/Desactivar: Supervisor o Admin
-    - Estadísticas: Supervisor o Admin
     """
     queryset = Cliente.objects.all()
+    modulo_auditoria = 'CLIENTES'
     
     def get_serializer_class(self):
         """Seleccionar serializer según la acción"""
@@ -147,6 +127,17 @@ class ClienteViewSet(viewsets.ModelViewSet):
             )
             
             response_serializer = ClienteDetailSerializer(cliente)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='CREAR',
+                modulo=self.modulo_auditoria,
+                objeto=cliente,
+                descripcion=f"Cliente creado: {cliente.nombre}",
+                request=request
+            )
+
             return Response(
                 {
                     'detail': 'Cliente creado exitosamente',
@@ -168,19 +159,29 @@ class ClienteViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         
         try:
-            # 🔥 SOLO enviamos los campos que realmente vienen
+            old_data = self.snapshot_objeto(instance)
+            
             cliente = ClienteService.actualizar_cliente(
-                cliente_id=instance.id,
-                **serializer.validated_data
-            )
-
-            ActividadService.registrar(
-                tipo="CLIENTE",
-                accion="ACTUALIZADO",
-                descripcion=f"Cliente actualizado: {cliente.nombre}",
-                usuario=request.user,
+                pk=instance.pk,
+                nombre=serializer.validated_data.get("nombre"),
+                telefono=serializer.validated_data.get("telefono"),
+                email=serializer.validated_data.get("email"),
+                direccion=serializer.validated_data.get("direccion"),
+                estado=serializer.validated_data.get("estado"),
             )
             
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=cliente,
+                descripcion=f"Cliente actualizado: {cliente.nombre}",
+                request=request,
+                datos_antes=old_data,
+                datos_despues=self.snapshot_objeto(cliente)
+            )
+
             response_serializer = ClienteDetailSerializer(cliente)
             return Response(
                 {
@@ -249,6 +250,17 @@ class ClienteViewSet(viewsets.ModelViewSet):
         """
         try:
             cliente = ClienteService.desactivar_cliente(pk)
+            
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='ACTUALIZAR',
+                modulo=self.modulo_auditoria,
+                objeto=cliente,
+                descripcion=f"Cliente desactivado: {cliente.nombre}",
+                request=request
+            )
+
             return Response(
                 {
                     'detail': f'Cliente {cliente.nombre} desactivado exitosamente.',

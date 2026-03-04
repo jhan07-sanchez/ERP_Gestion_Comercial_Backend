@@ -14,6 +14,7 @@ class Venta(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='ventas')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='ventas')
     total = models.DecimalField(max_digits=10, decimal_places=2)
+    impuesto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE')
     fecha = models.DateTimeField(auto_now_add=True)
 

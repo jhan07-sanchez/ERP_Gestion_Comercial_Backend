@@ -85,6 +85,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Middleware de Auditoría ERP (Seguridad y Errores)
+    'apps.auditorias.middleware.AuditoriaMiddleware',
 ]
 
 

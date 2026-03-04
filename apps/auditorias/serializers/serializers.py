@@ -90,6 +90,7 @@ class LogAuditoriaDetailSerializer(serializers.ModelSerializer):
     icono = serializers.CharField(source="icono_accion", read_only=True)
     tiene_cambios = serializers.BooleanField(read_only=True)
     tipo_objeto = serializers.SerializerMethodField()
+    diff = serializers.SerializerMethodField()
 
     class Meta:
         model = LogAuditoria
@@ -102,6 +103,7 @@ class LogAuditoriaDetailSerializer(serializers.ModelSerializer):
             "icono",
             "tiene_cambios",
             "tipo_objeto",
+            "diff",
         ]
 
     def get_usuario_info(self, obj):
@@ -121,6 +123,12 @@ class LogAuditoriaDetailSerializer(serializers.ModelSerializer):
                 "modelo": obj.content_type.model,
                 "nombre": obj.content_type.name,
             }
+        return None
+
+    def get_diff(self, obj):
+        """Extrae el diff del campo extra si existe."""
+        if obj.extra and isinstance(obj.extra, dict):
+            return obj.extra.get("diff")
         return None
 
 
