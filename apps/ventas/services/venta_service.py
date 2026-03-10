@@ -18,6 +18,11 @@ from decimal import Decimal
 
 from apps.configuracion.services.configuracion_service import ConfiguracionService
 
+from apps.ventas.models import Venta, DetalleVenta, PagoVenta
+from apps.clientes.models import Cliente
+from apps.productos.models import Producto
+from apps.inventario.models import Inventario, MovimientoInventario
+
 class VentaService:
     """Servicio para manejar la lógica de negocio de Ventas"""
     
