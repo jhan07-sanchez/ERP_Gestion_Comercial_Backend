@@ -38,6 +38,7 @@ from apps.compras.serializers import (
     CompraCreateSerializer,
     CompraUpdateSerializer,
     CompraAnularSerializer,
+    PagoCompraSerializer,
 )
 from apps.compras.services import (
     CompraService,
@@ -50,6 +51,7 @@ from apps.usuarios.permissions import (
     EsAlmacenista,
     PuedeGestionarCompras,
 )
+from apps.caja.permissions import CajaAbiertaPermission
 
 logger = logging.getLogger("compras")
 
@@ -149,56 +151,20 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
             return CompraUpdateSerializer
         elif self.action == "anular":
             return CompraAnularSerializer
+        elif self.action == "registrar_pago":
+            return PagoCompraSerializer
         return CompraDetailSerializer
 
     modulo_auditoria = 'COMPRAS'
-
-    def create(self, request, *args, **kwargs):
-        """Crear compra usando el servicio"""
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            compra = CompraService.crear_compra(
-                proveedor_id=serializer.validated_data['proveedor_id'],
-                detalles=serializer.validated_data['detalles'],
-                usuario=request.user,
-                estado=serializer.validated_data.get('estado', 'PENDIENTE')
-            )
-
-            # Auditoría
-            AuditoriaService.registrar_accion(
-                usuario=request.user,
-                accion='CREAR',
-                modulo=self.modulo_auditoria,
-                objeto=compra,
-                descripcion=f"Compra creada: ID {compra.id} - Proveedor: {compra.proveedor.nombre}",
-                request=request,
-                datos_despues=snapshot_objeto(compra)
-            )
-
-            response_serializer = CompraDetailSerializer(compra)
-            return Response(
-                {
-                    'detail': 'Compra creada exitosamente',
-                    'compra': response_serializer.data
-                },
-                status=status.HTTP_201_CREATED
-            )
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
     def get_permissions(self):
         """Permisos según la acción"""
         if self.action in ["list", "retrieve"]:
             permission_classes = [IsAuthenticated, EsAlmacenista]
-        elif self.action in ["create", "update", "partial_update"]:
-            permission_classes = [IsAuthenticated, PuedeGestionarCompras]
+        elif self.action in ["create", "update", "partial_update", "registrar_pago"]:
+            permission_classes = [IsAuthenticated, PuedeGestionarCompras, CajaAbiertaPermission]
         elif self.action in ["destroy", "confirmar", "anular"]:
-            permission_classes = [IsAuthenticated, EsSupervisor]
+            permission_classes = [IsAuthenticated, EsSupervisor, CajaAbiertaPermission]
         else:
             permission_classes = [IsAuthenticated]
 
@@ -263,6 +229,7 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
                 usuario=request.user,
                 fecha=serializer.validated_data["fecha"],
                 observaciones=serializer.validated_data.get("observaciones"),
+                request=request,  # 🔹 PASAR REQUEST
             )
 
             response_serializer = CompraDetailSerializer(compra)
@@ -282,9 +249,11 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
                 {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
+            import traceback
             logger.error(f"Error inesperado al crear compra: {str(e)}")
+            logger.error(traceback.format_exc())  # 🔹 LOG COMPLETO DEL ERROR
             return Response(
-                {"success": False, "error": "Error interno del servidor"},
+                {"success": False, "error": "Error interno del servidor", "detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -396,6 +365,67 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
         except CompraError as e:
             return Response(
                 {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # ========================================================================
+    # REGISTRAR PAGO
+    # ========================================================================
+
+    @action(detail=True, methods=["post"])
+    def registrar_pago(self, request, pk=None):
+        """
+        Registrar un pago a una compra.
+        
+        POST /api/compras/{id}/registrar_pago/
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            # Reutilizamos CompraService.registrar_pago
+            pago = CompraService.registrar_pago(
+                compra_id=pk,
+                monto=serializer.validated_data["monto"],
+                metodo_pago=serializer.validated_data["metodo_pago"],
+                usuario=request.user,
+                referencia=serializer.validated_data.get("referencia", "")
+            )
+            
+            # Recargar la compra para devolver los datos actualizados
+            compra = self.get_object()
+            response_serializer = CompraDetailSerializer(compra)
+            
+            return Response(
+                {
+                    "success": True,
+                    "message": f"Pago de ${pago.monto} registrado exitosamente",
+                    "data": response_serializer.data,
+                },
+                status=status.HTTP_201_CREATED
+            )
+            
+        except ValueError as e:
+            return Response(
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except CompraStateError as e:
+            return Response(
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except CompraError as e:
+            return Response(
+                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            from apps.caja.services.caja_control import CajaCerradaOperacionError
+            if isinstance(e, CajaCerradaOperacionError):
+                return Response(
+                    {"success": False, "error": str(e)}, status=status.HTTP_403_FORBIDDEN
+                )
+            logger.error(f"Error inesperado al registrar pago de compra: {str(e)}")
+            return Response(
+                {"success": False, "error": "Error interno del servidor"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     # ========================================================================

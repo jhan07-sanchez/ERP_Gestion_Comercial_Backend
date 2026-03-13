@@ -9,8 +9,9 @@ from apps.proveedores.models import Proveedor
 class Compra(models.Model):
     ESTADO_COMPRA = [
         ("PENDIENTE", "Pendiente"),
+        ("PARCIAL", "Parcial"),
+        ("COMPLETADA", "Completada"),
         ("ANULADA", "Anulada"),
-        ("REALIZADA", "Realizada"),
     ]
 
     numero_compra = models.CharField(max_length=20, unique=True, editable=False)
@@ -47,15 +48,10 @@ class Compra(models.Model):
     def __str__(self):
         return f"{self.numero_compra} - {self.proveedor.nombre} - ${self.total}"
 
-    # 🔹 Generar número automático tipo COMP-00001
+    # 🔹 Generar número automático usando configuración global
     def generar_numero_compra(self):
-        last = Compra.objects.order_by("-id").first()
-        if not last:
-            return "COMP-00001"
-
-        last_number = int(last.numero_compra.split("-")[-1])
-        new_number = last_number + 1
-        return f"COMP-{new_number:05d}"
+        from apps.configuracion.services.configuracion_service import ConfiguracionService
+        return ConfiguracionService.generar_numero_compra()
 
     # 🔹 Override save
     def save(self, *args, **kwargs):
@@ -110,3 +106,39 @@ class DetalleCompra(models.Model):
         compra = self.compra
         super().delete(*args, **kwargs)
         compra.recalcular_total()
+
+
+class PagoCompra(models.Model):
+    METODO_PAGO_CHOICES = [
+        ("EFECTIVO", "Efectivo"),
+        ("TARJETA", "Tarjeta"),
+        ("TRANSFERENCIA", "Transferencia"),
+        ("YAPE", "Yape"),
+        ("PLIN", "Plin"),
+        ("CREDITO", "Crédito"),
+    ]
+
+    compra = models.ForeignKey(
+        Compra, on_delete=models.CASCADE, related_name="pagos"
+    )
+    monto = models.DecimalField(max_digits=12, decimal_places=2)
+    metodo_pago = models.CharField(
+        max_length=20, choices=METODO_PAGO_CHOICES, default="EFECTIVO"
+    )
+    referencia = models.CharField(max_length=100, blank=True, null=True)
+    fecha = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="pagos_compras_registrados",
+    )
+
+    class Meta:
+        db_table = "pago_compra"
+        verbose_name = "Pago de Compra"
+        verbose_name_plural = "Pagos de Compras"
+        ordering = ["fecha"]
+
+    def __str__(self):
+        return f"Pago #{self.id} de Compra #{self.compra.numero_compra} - ${self.monto}"
+

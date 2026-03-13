@@ -130,6 +130,8 @@ class VentaListSerializer(serializers.ModelSerializer):
         model = Venta
         fields = [
             'id',
+            'numero_documento',
+            'tipo_documento',
             'cliente',
             'cliente_nombre',
             'cliente_numero_documento',
@@ -240,6 +242,8 @@ class VentaDetailSerializer(serializers.ModelSerializer):
         model = Venta
         fields = [
             'id',
+            'numero_documento',
+            'tipo_documento',
             'cliente',
             'cliente_nombre',
             'cliente_info',

@@ -11,8 +11,15 @@ class Venta(models.Model):
         ('CANCELADA', 'Cancelada'),
     ]
 
+    TIPO_DOCUMENTO_CHOICES = [
+        ('FACTURA', 'Factura'),
+        ('RECIBO', 'Recibo POS'),
+    ]
+
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='ventas')
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='ventas')
+    numero_documento = models.CharField(max_length=20, unique=True, editable=False, null=True, blank=True)
+    tipo_documento = models.CharField(max_length=10, choices=TIPO_DOCUMENTO_CHOICES, default='FACTURA')
     total = models.DecimalField(max_digits=10, decimal_places=2)
     impuesto = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE')
@@ -24,8 +31,17 @@ class Venta(models.Model):
         verbose_name_plural = 'Ventas'
         ordering = ['-fecha']
 
+    def save(self, *args, **kwargs):
+        if not self.numero_documento:
+            from apps.configuracion.services.configuracion_service import ConfiguracionService
+            if self.tipo_documento == 'FACTURA':
+                self.numero_documento = ConfiguracionService.generar_numero_factura()
+            else:
+                self.numero_documento = ConfiguracionService.generar_numero_recibo()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Venta #{self.id} - {self.cliente.nombre} - ${self.total}"
+        return f"{self.numero_documento} - {self.cliente.nombre} - ${self.total}"
 
 class PagoVenta(models.Model):
     METODO_PAGO_CHOICES = [

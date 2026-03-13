@@ -23,10 +23,12 @@ from django.utils import timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from apps.compras.models import Compra, DetalleCompra
+from apps.compras.models import Compra, DetalleCompra, PagoCompra
 from apps.productos.models import Producto
 from apps.inventario.models import Inventario, MovimientoInventario
 from apps.proveedores.models import Proveedor
+from apps.caja.services.caja_service import CajaService
+from apps.caja.models import MetodoPago
 
 # Configurar logger
 logger = logging.getLogger("compras")
@@ -91,6 +93,7 @@ class CompraService:
         usuario,
         fecha,
         observaciones: Optional[str] = None,
+        request=None,
     ) -> Compra:
         """
         Crear una nueva compra con sus detalles
@@ -195,7 +198,7 @@ class CompraService:
                 modulo='COMPRAS',
                 objeto=compra,
                 descripcion=f"Compra #{compra.numero_compra} creada",
-                request=request if 'request' in locals() else None,
+                request=request,
             )
 
             # 5. Crear los detalles
@@ -222,7 +225,90 @@ class CompraService:
             raise CompraError(f"Error al crear la compra: {str(e)}")
 
     # ========================================================================
-    # CONFIRMAR COMPRA (REALIZADA)
+    # REGISTRAR PAGO (PARCIAL O TOTAL)
+    # ========================================================================
+
+    @staticmethod
+    @transaction.atomic
+    def registrar_pago(compra_id, monto, metodo_pago, usuario, referencia=None):
+        """
+        Registra un pago parcial o total para una compra.
+        Actualiza el estado de la compra y aumenta el inventario si es el primer pago.
+        """
+        try:
+            compra = Compra.objects.prefetch_related('detalles__producto').get(id=compra_id)
+            
+            if compra.estado == 'ANULADA':
+                raise CompraStateError('No se pueden registrar pagos a una compra anulada.')
+                
+            pagos_previos = compra.pagos.aggregate(total=Sum('monto'))['total'] or Decimal('0.00')
+            saldo_pendiente = compra.total - Decimal(str(pagos_previos))
+            monto_decimal = Decimal(str(monto))
+            
+            if monto_decimal <= 0:
+                raise ValueError('El monto debe ser mayor a 0.')
+                
+            if monto_decimal > saldo_pendiente:
+                raise ValueError(f'El monto excede el saldo pendiente. Saldo actual: {saldo_pendiente}')
+            # Mapear el string metodo_pago al modelo MetodoPago de Caja
+            # Buscamos de forma case-insensitive, si no existe usamos el primero disponible
+            metodo_caja = MetodoPago.objects.filter(nombre__iexact=metodo_pago, activo=True).first()
+            if not metodo_caja:
+                metodo_caja = MetodoPago.objects.filter(activo=True).first()
+                
+            if not metodo_caja:
+                raise CompraError("No hay métodos de pago activos en Caja para registrar el egreso.")
+            
+            # 1. Registrar el pago
+            pago = PagoCompra.objects.create(
+                compra=compra,
+                monto=monto_decimal,
+                metodo_pago=metodo_pago,
+                referencia=referencia,
+                usuario=usuario
+            )
+
+            # REGLA ERP: Llamar a la caja y registrar el egreso
+            # Esto fallará si el usuario no tiene caja abierta (CajaCerradaOperacionError)
+            CajaService.registrar_pago_compra(
+                compra=compra,
+                usuario=usuario,
+                metodo_pago_id=metodo_caja.id,
+                monto=monto_decimal
+            )
+            
+            # 2. Registrar Auditoría del Pago
+            AuditoriaService.registrar_accion(
+                usuario=usuario,
+                accion='ACTUALIZAR',
+                modulo='COMPRAS',
+                objeto=compra,
+                descripcion=f"Pago de ${monto_decimal} registrado para {compra.numero_compra}",
+                request=None
+            )
+            
+            # 3. Recalcular y actualizar estado de la compra
+            nuevo_total_pagado = pagos_previos + monto_decimal
+            
+            if nuevo_total_pagado >= compra.total:
+                compra.estado = 'COMPLETADA'
+            else:
+                compra.estado = 'PARCIAL'
+                
+            compra.save()
+            
+            logger.info(f"✅ Pago de ${monto_decimal} registrado para compra ID: {compra_id}")
+            return pago
+            
+        except Compra.DoesNotExist:
+            raise CompraError(f"La compra con ID {compra_id} no existe.")
+        except Exception as e:
+            logger.error(f"❌ Error al registrar pago para la compra: {str(e)}")
+            raise CompraError(f"Error al registrar el pago: {str(e)}")
+
+
+    # ========================================================================
+    # CONFIRMAR COMPRA (SIN PAGO, COMPLETAR MANUALMENTE)
     # ========================================================================
 
     @staticmethod
@@ -246,7 +332,7 @@ class CompraService:
         1. Validar estado PENDIENTE
         2. Aumentar stock de productos
         3. Registrar movimientos de inventario
-        4. Cambiar estado a REALIZADA
+        4. Cambiar estado a COMPLETADA
         5. Log de auditoría
         """
         try:
@@ -288,6 +374,24 @@ class CompraService:
                     f"  📦 Stock actualizado: {detalle.producto.nombre} "
                     f"+{detalle.cantidad} (Total: {inventario.stock_actual})"
                 )
+
+            # 4. Cambiar estado a COMPLETADA (solo si ya estaba pagada, lo cual es raro al confirmar)
+            # Normalmente una compra confirmada pero no pagada sigue PENDIENTE de pago.
+            # Sin embargo, para no romper el flujo actual, la dejaremos en PENDIENTE si no hay pagos.
+            # Si el usuario quiere que 'Confirmar' no signifique 'Pagado', cambiamos esto:
+            # compra.estado = "COMPLETADA" # <-- Esto estaba marcando como pagada sin pagar.
+            
+            # REGLA ERP: Confirmar = Recibir mercadería. El estado financiero depende de los pagos.
+            # Si no hay pagos, el estado debe ser PENDIENTE. Si hay parciales, PARCIAL.
+            pagos_totales = compra.pagos.aggregate(total=Sum('monto'))['total'] or Decimal('0.00')
+            if pagos_totales >= compra.total:
+                compra.estado = "COMPLETADA"
+            elif pagos_totales > 0:
+                compra.estado = "PARCIAL"
+            else:
+                compra.estado = "PENDIENTE"
+                
+            compra.save()
 
             # Auditoría
             AuditoriaService.registrar_accion(
@@ -354,9 +458,9 @@ class CompraService:
             if compra.estado == "ANULADA":
                 raise CompraStateError("La compra ya está anulada.")
 
-            # 3. Si está REALIZADA, revertir inventario
-            if compra.estado == "REALIZADA":
-                logger.info("  🔄 Compra REALIZADA, revirtiendo inventario...")
+            # 3. Si está COMPLETADA o PARCIAL, revertir inventario
+            if compra.estado in ["COMPLETADA", "PARCIAL"]:
+                logger.info(f"  🔄 Compra en estado {compra.estado}, revirtiendo inventario...")
 
                 # Validar stock suficiente para cada producto
                 for detalle in compra.detalles.all():
@@ -396,6 +500,11 @@ class CompraService:
                         f"  📦 Stock revertido: {detalle.producto.nombre} "
                         f"-{detalle.cantidad} (Total: {inventario.stock_actual})"
                     )
+
+            # 5. Cambiar el estado a ANULADA
+            compra.estado = "ANULADA"
+            compra.motivo_anulacion = motivo
+            compra.save()
 
             # Auditoría
             AuditoriaService.registrar_accion(

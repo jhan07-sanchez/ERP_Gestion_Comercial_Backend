@@ -16,8 +16,8 @@ Fecha: 2026-02-15
 
 from rest_framework import serializers
 from django.db.models import Sum
-from apps.compras.models import Compra, DetalleCompra
 from apps.productos.models import Producto
+from apps.compras.models import Compra, DetalleCompra, PagoCompra
 from apps.proveedores.serializers import ProveedorSimpleSerializer
 
 
@@ -119,6 +119,34 @@ class DetalleCompraReadSerializer(serializers.ModelSerializer):
 
 
 # ============================================================================
+# SERIALIZERS DE PAGOS DE COMPRA (READ)
+# ============================================================================
+
+
+class PagoCompraReadSerializer(serializers.ModelSerializer):
+    """
+    Serializer de lectura para Pagos de Compra
+    """
+
+    usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    metodo_pago_display = serializers.CharField(
+        source="get_metodo_pago_display", read_only=True
+    )
+
+    class Meta:
+        model = PagoCompra
+        fields = [
+            "id",
+            "monto",
+            "metodo_pago",
+            "metodo_pago_display",
+            "referencia",
+            "fecha",
+            "usuario_nombre",
+        ]
+
+
+# ============================================================================
 # SERIALIZERS DE COMPRA (READ)
 # ============================================================================
 
@@ -157,6 +185,9 @@ class CompraListSerializer(serializers.ModelSerializer):
     # Resumen de productos (para tooltip o detalles rápidos)
     productos_resumen = serializers.SerializerMethodField()
 
+    # Financiero
+    saldo_pendiente = serializers.SerializerMethodField()
+
     class Meta:
         model = Compra
         fields = [
@@ -172,6 +203,7 @@ class CompraListSerializer(serializers.ModelSerializer):
             "total",
             "total_productos",
             "total_unidades",
+            "saldo_pendiente",  # 🔹 NUEVO
             "fecha",
             "estado",
             "estado_badge",  # 🔹 Para el frontend
@@ -206,6 +238,11 @@ class CompraListSerializer(serializers.ModelSerializer):
         detalles = obj.detalles.select_related("producto").all()
         return ", ".join([d.producto.nombre for d in detalles])
 
+    def get_saldo_pendiente(self, obj):
+        """Calcular cuánto falta por pagar"""
+        pagado = obj.pagos.aggregate(total=Sum("monto"))["total"] or 0
+        return float(obj.total - pagado)
+
 class CompraDetailSerializer(serializers.ModelSerializer):
     """
     Serializer para detalle completo de compra
@@ -230,9 +267,14 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     # Detalles de productos
     detalles = DetalleCompraReadSerializer(many=True, read_only=True)
 
+    # Historial de pagos
+    pagos = PagoCompraReadSerializer(many=True, read_only=True)
+
     # Estadísticas calculadas
     total_productos = serializers.SerializerMethodField()
     total_unidades = serializers.SerializerMethodField()
+    total_pagado = serializers.SerializerMethodField()
+    saldo_pendiente = serializers.SerializerMethodField()
     margen_potencial = serializers.SerializerMethodField()
 
     # Badge de estado
@@ -241,6 +283,7 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     # Información de auditoría
     puede_editar = serializers.SerializerMethodField()
     puede_confirmar = serializers.SerializerMethodField()
+    puede_pagar = serializers.SerializerMethodField()
     puede_anular = serializers.SerializerMethodField()
 
     class Meta:
@@ -255,7 +298,10 @@ class CompraDetailSerializer(serializers.ModelSerializer):
             "usuario_nombre",
             "usuario_email",
             "total",
+            "total_pagado",  # 🔹 NUEVO
+            "saldo_pendiente",  # 🔹 NUEVO
             "detalles",
+            "pagos",  # 🔹 NUEVO
             "total_productos",
             "total_unidades",
             "margen_potencial",
@@ -267,6 +313,7 @@ class CompraDetailSerializer(serializers.ModelSerializer):
             # Permisos (para UI)
             "puede_editar",
             "puede_confirmar",
+            "puede_pagar",  # 🔹 NUEVO
             "puede_anular",
         ]
 
@@ -278,6 +325,16 @@ class CompraDetailSerializer(serializers.ModelSerializer):
         """Total de unidades compradas"""
         total = obj.detalles.aggregate(total=Sum("cantidad"))["total"]
         return total or 0
+
+    def get_total_pagado(self, obj):
+        """Suma de todos los pagos realizados"""
+        total = obj.pagos.aggregate(total=Sum("monto"))["total"]
+        return float(total or 0)
+
+    def get_saldo_pendiente(self, obj):
+        """Total - Pagado"""
+        total_pagado = obj.pagos.aggregate(total=Sum("monto"))["total"] or 0
+        return float(obj.total - total_pagado)
 
     def get_margen_potencial(self, obj):
         """
@@ -309,8 +366,9 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     def get_estado_badge(self, obj):
         """Badge para el frontend"""
         badges = {
-            "PENDIENTE": {"color": "warning", "texto": "Pendiente", "icono": "⏳"},
-            "REALIZADA": {"color": "success", "texto": "Realizada", "icono": "✓"},
+            "PENDIENTE": {"color": "gray", "texto": "Pendiente", "icono": "⏳"},
+            "PARCIAL": {"color": "warning", "texto": "Parcial", "icono": "💳"},
+            "COMPLETADA": {"color": "success", "texto": "Completada", "icono": "✓"},
             "ANULADA": {"color": "danger", "texto": "Anulada", "icono": "✗"},
         }
         return badges.get(obj.estado, badges["PENDIENTE"])
@@ -326,6 +384,10 @@ class CompraDetailSerializer(serializers.ModelSerializer):
     def get_puede_anular(self, obj):
         """Solo se puede anular si NO está ANULADA"""
         return obj.estado != "ANULADA"
+
+    def get_puede_pagar(self, obj):
+        """Se puede pagar si no está COMPLETADA ni ANULADA"""
+        return obj.estado not in ["COMPLETADA", "ANULADA"]
 
 
 class CompraSimpleSerializer(serializers.ModelSerializer):

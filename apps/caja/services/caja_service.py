@@ -24,6 +24,8 @@ from django.db.models import Sum
 from decimal import Decimal
 from typing import Optional, Dict, Any
 
+from apps.caja.services.caja_control import CajaControlService, CajaCerradaOperacionError
+
 from apps.caja.models import (
     Caja,
     SesionCaja,
@@ -327,7 +329,7 @@ class CajaService:
         usuario,
         metodo_pago_id: int,
         monto: Optional[Decimal] = None,
-    ) -> Optional[MovimientoCaja]:
+    ) -> MovimientoCaja:
         """
         Registrar automáticamente el pago de una venta en caja.
 
@@ -336,8 +338,7 @@ class CajaService:
         - El servicio de ventas llama a este método
         - No necesita saber cómo funciona la caja internamente
 
-        Si el usuario no tiene sesión abierta, NO falla (devuelve None).
-        Esto permite que ventas funcione sin caja obligatoria.
+        REGLA ERP: Requiere caja abierta. Si no hay sesión, lanza excepción.
 
         Args:
             venta: Instancia del modelo Venta
@@ -346,19 +347,13 @@ class CajaService:
             monto: Si None, usa venta.total
 
         Returns:
-            MovimientoCaja o None si no hay sesión abierta
-        """
-        # Buscar sesión abierta del usuario
-        sesion = SesionCaja.objects.filter(
-            usuario=usuario, estado=SesionCaja.ESTADO_ABIERTA
-        ).first()
+            MovimientoCaja: El movimiento de ingreso creado
 
-        if not sesion:
-            logger.warning(
-                f"Venta #{venta.id} pagada pero usuario '{usuario.username}' "
-                f"no tiene sesión de caja abierta. No se registró en caja."
-            )
-            return None
+        Raises:
+            CajaCerradaOperacionError: Si no hay caja abierta
+        """
+        # Verificar caja abierta (lanza excepción si no hay)
+        sesion = CajaControlService.verificar_caja_abierta(usuario)
 
         monto_final = monto if monto is not None else venta.total
 
@@ -381,22 +376,19 @@ class CajaService:
         usuario,
         metodo_pago_id: int,
         monto: Optional[Decimal] = None,
-    ) -> Optional[MovimientoCaja]:
+    ) -> MovimientoCaja:
         """
         Registrar automáticamente el pago de una compra en caja.
 
         Análogo a registrar_pago_venta pero para egresos.
-        """
-        sesion = SesionCaja.objects.filter(
-            usuario=usuario, estado=SesionCaja.ESTADO_ABIERTA
-        ).first()
 
-        if not sesion:
-            logger.warning(
-                f"Compra #{compra.id} pagada pero usuario '{usuario.username}' "
-                f"no tiene sesión de caja abierta."
-            )
-            return None
+        REGLA ERP: Requiere caja abierta. Si no hay sesión, lanza excepción.
+
+        Raises:
+            CajaCerradaOperacionError: Si no hay caja abierta
+        """
+        # Verificar caja abierta (lanza excepción si no hay)
+        sesion = CajaControlService.verificar_caja_abierta(usuario)
 
         monto_final = monto if monto is not None else compra.total
 

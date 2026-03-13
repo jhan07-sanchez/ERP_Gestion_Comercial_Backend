@@ -22,13 +22,15 @@ from apps.ventas.models import Venta, DetalleVenta, PagoVenta
 from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 from apps.inventario.models import Inventario, MovimientoInventario
+from apps.caja.services.caja_service import CajaService
+from apps.caja.models import MetodoPago
 
 class VentaService:
     """Servicio para manejar la lógica de negocio de Ventas"""
     
     @staticmethod
     @transaction.atomic
-    def crear_venta(cliente_id, detalles, usuario, estado='PENDIENTE'):
+    def crear_venta(cliente_id, detalles, usuario, estado='PENDIENTE', tipo_documento='FACTURA'):
         """
         Crear una nueva venta con sus detalles gobernada por la configuración global.
         """
@@ -64,7 +66,8 @@ class VentaService:
             usuario=usuario,
             total=total_venta,
             impuesto=impuesto,
-            estado=estado
+            estado=estado,
+            tipo_documento=tipo_documento
         )
         
         # 4. Crear detalles
@@ -167,6 +170,19 @@ class VentaService:
         if monto_decimal > saldo_pendiente:
             raise ValueError(f'El monto excede el saldo pendiente. Saldo actual: {saldo_pendiente}')
             
+        # Mapear el string metodo_pago al modelo MetodoPago de Caja
+        metodo_caja = MetodoPago.objects.filter(nombre__iexact=metodo_pago, activo=True).first()
+        
+        # Si no lo encuentra por nombre exacto, intentar por el primero activo
+        if not metodo_caja:
+            metodo_caja = MetodoPago.objects.filter(activo=True).first()
+            
+        if not metodo_caja:
+            raise ValueError(
+                "No hay métodos de pago activos configurados en el módulo de Caja. "
+                "Por favor, contacte al administrador para inicializar los métodos de pago."
+            )
+        
         # 1. Registrar el pago
         pago = PagoVenta.objects.create(
             venta=venta,
@@ -176,6 +192,15 @@ class VentaService:
             vuelto=vuelto,
             referencia=referencia,
             usuario=usuario
+        )
+
+        # REGLA ERP: Llamar a la caja y registrar el ingreso
+        # Esto fallará si el usuario no tiene caja abierta (CajaCerradaOperacionError)
+        CajaService.registrar_pago_venta(
+            venta=venta,
+            usuario=usuario,
+            metodo_pago_id=metodo_caja.id,
+            monto=monto_decimal
         )
         
         # 2. Verificar y descontar inventario si es el PRIMER pago (venta pasa de PENDIENTE a PARCIAL o COMPLETADA)

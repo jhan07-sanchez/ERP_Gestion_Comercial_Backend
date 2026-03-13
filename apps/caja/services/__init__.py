@@ -9,6 +9,11 @@ from .caja_service import (
     MovimientoInvalidoError,
 )
 
+from .caja_control import (
+    CajaControlService,
+    CajaCerradaOperacionError,
+)
+
 __all__ = [
     "CajaService",
     "MetodoPagoService",
@@ -17,4 +22,6 @@ __all__ = [
     "CajaCerradaError",
     "SesionNoEncontradaError",
     "MovimientoInvalidoError",
+    "CajaControlService",
+    "CajaCerradaOperacionError",
 ]

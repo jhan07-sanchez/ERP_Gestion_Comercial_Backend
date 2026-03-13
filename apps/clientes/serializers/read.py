@@ -31,6 +31,7 @@ class ClienteListSerializer(serializers.ModelSerializer):
     - Estado activo/inactivo
     """
     estado_badge = serializers.SerializerMethodField()
+    documento = serializers.CharField(source='numero_documento', read_only=True)
     
     class Meta:
         model = Cliente
@@ -39,6 +40,7 @@ class ClienteListSerializer(serializers.ModelSerializer):
             'nombre',
             'tipo_documento',
             'numero_documento',
+            'documento',
             'telefono',
             'email',
             'estado',
@@ -82,6 +84,7 @@ class ClienteDetailSerializer(serializers.ModelSerializer):
     - Estado del cliente
     """
     estado_badge = serializers.SerializerMethodField()
+    documento = serializers.CharField(source='numero_documento', read_only=True)
     total_ventas = serializers.SerializerMethodField()
     total_comprado = serializers.SerializerMethodField()
     ultima_compra = serializers.SerializerMethodField()
@@ -93,6 +96,7 @@ class ClienteDetailSerializer(serializers.ModelSerializer):
             'nombre',
             'tipo_documento',
             'numero_documento',
+            'documento',
             'telefono',
             'email',
             'direccion',

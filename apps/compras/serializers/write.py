@@ -444,3 +444,29 @@ class CompraAnularSerializer(serializers.Serializer):
             )
 
         return value.strip()
+
+
+class PagoCompraSerializer(serializers.Serializer):
+    """
+    Serializer para registrar un pago parcial o total
+    """
+    monto = serializers.DecimalField(
+        max_digits=12, 
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        error_messages={
+            "required": "El monto es requerido.",
+            "min_value": "El monto debe ser mayor a 0."
+        }
+    )
+    metodo_pago = serializers.CharField(
+        max_length=20,
+        required=True,
+        error_messages={"required": "El método de pago es requerido."}
+    )
+    referencia = serializers.CharField(
+        max_length=100, 
+        required=False,
+        allow_blank=True
+    )
+

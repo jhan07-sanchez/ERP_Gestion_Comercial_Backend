@@ -39,8 +39,8 @@ from apps.usuarios.permissions import (
     EsSupervisor,
     EsVendedor,
     PuedeGestionarVentas,
-
 )
+from apps.caja.permissions import CajaAbiertaPermission
 
 
 # ============================================================================
@@ -96,8 +96,8 @@ class VentaViewSet(MixinAuditable, viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             permission_classes = [IsAuthenticated, EsVendedor]
 
-        elif self.action in ['create', 'update', 'partial_update', 'completar']:
-            permission_classes = [IsAuthenticated, PuedeGestionarVentas]
+        elif self.action in ['create', 'update', 'partial_update', 'completar', 'registrar_pago']:
+            permission_classes = [IsAuthenticated, PuedeGestionarVentas, CajaAbiertaPermission]
 
         elif self.action in ['destroy', 'cancelar']:
             permission_classes = [IsAuthenticated, EsSupervisor]
@@ -174,7 +174,8 @@ class VentaViewSet(MixinAuditable, viewsets.ModelViewSet):
                 cliente_id=serializer.validated_data['cliente_id'],
                 detalles=serializer.validated_data['detalles'],
                 usuario=request.user,
-                estado=serializer.validated_data.get('estado', 'PENDIENTE')
+                estado=serializer.validated_data.get('estado', 'PENDIENTE'),
+                tipo_documento=serializer.validated_data.get('tipo_documento', 'FACTURA')
             )
 
             response_serializer = VentaDetailSerializer(venta)
@@ -368,6 +369,11 @@ class VentaViewSet(MixinAuditable, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
+            from apps.caja.services.caja_control import CajaCerradaOperacionError
+            if isinstance(e, CajaCerradaOperacionError):
+                return Response(
+                    {"error": str(e)}, status=status.HTTP_403_FORBIDDEN
+                )
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

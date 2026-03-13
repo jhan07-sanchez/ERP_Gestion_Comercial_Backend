@@ -224,6 +224,19 @@ class SesionCaja(models.Model):
             models.Index(fields=["estado", "caja"]),
             models.Index(fields=["fecha_apertura"]),
         ]
+        # Constraints de integridad: solo una sesión abierta por caja y por usuario
+        constraints = [
+            models.UniqueConstraint(
+                fields=["caja"],
+                condition=models.Q(estado="ABIERTA"),
+                name="unique_sesion_abierta_por_caja",
+            ),
+            models.UniqueConstraint(
+                fields=["usuario"],
+                condition=models.Q(estado="ABIERTA"),
+                name="unique_sesion_abierta_por_usuario",
+            ),
+        ]
 
     def __str__(self):
         return f"Sesión {self.caja.nombre} - {self.usuario.username} ({self.fecha_apertura.date()})"

@@ -304,7 +304,7 @@ class ClienteViewSet(MixinAuditable, viewsets.ModelViewSet):
             data.append({
                 'id': cliente.id,
                 'nombre': cliente.nombre,
-                'numero_documento': cliente.documento,
+                'numero_documento': cliente.numero_documento,
                 'total_compras': cliente.total_compras,
                 'total_gastado': float(cliente.total_gastado) if cliente.total_gastado else 0
             })
@@ -329,7 +329,7 @@ class ClienteViewSet(MixinAuditable, viewsets.ModelViewSet):
             data.append({
                 'id': cliente.id,
                 'nombre': cliente.nombre,
-                'numero_documento': cliente.documento,
+                'numero_documento': cliente.numero_documento,
                 'total_compras': cliente.total_compras,
                 'total_gastado': float(cliente.total_gastado) if cliente.total_gastado else 0
             })

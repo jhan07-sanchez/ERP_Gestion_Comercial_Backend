@@ -16,6 +16,8 @@ from .read import (
     CompraListSerializer,
     CompraDetailSerializer,
     CompraSimpleSerializer,
+    # Pagos
+    PagoCompraReadSerializer,
 )
 
 from .write import (
@@ -26,6 +28,8 @@ from .write import (
     CompraCreateSerializer,
     CompraUpdateSerializer,
     CompraAnularSerializer,
+    # Pagos
+    PagoCompraSerializer,
 )
 
 __all__ = [
@@ -47,4 +51,8 @@ __all__ = [
     'CompraCreateSerializer',
     'CompraUpdateSerializer',
     'CompraAnularSerializer',
+    
+    # PAGOS
+    'PagoCompraReadSerializer',
+    'PagoCompraSerializer',
 ]

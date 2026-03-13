@@ -157,6 +157,11 @@ class VentaCreateSerializer(serializers.Serializer):
         default='PENDIENTE',
         required=False
     )
+    tipo_documento = serializers.ChoiceField(
+        choices=['FACTURA', 'RECIBO'],
+        default='FACTURA',
+        required=False
+    )
     
     def validate_cliente_id(self, value):
         """Validar que el cliente existe y está activo"""
