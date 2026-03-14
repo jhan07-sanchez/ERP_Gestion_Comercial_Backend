@@ -10,7 +10,6 @@ class Categoria(models.Model):
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'categorias'
         verbose_name = 'Categoría'
         verbose_name_plural = 'Categorías'
 
