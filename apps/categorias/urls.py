@@ -5,6 +5,7 @@ URLs para la app de Categorías
 Estructura modular siguiendo el patrón de arquitectura por dominio.
 """
 
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from apps.categorias.views import CategoriaViewSet
 
@@ -14,10 +15,12 @@ app_name = 'categorias'
 router = DefaultRouter()
 
 # Registrar ViewSets
-router.register(r'', CategoriaViewSet, basename='categoria')
+router.register(r'categorias', CategoriaViewSet, basename='categoria')
 
 # URLs
-urlpatterns = router.urls
+urlpatterns = [
+    path('', include(router.urls)),
+]
 
 """
 ═══════════════════════════════════════════════════════════════════════════
