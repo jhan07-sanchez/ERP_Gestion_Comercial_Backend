@@ -1,0 +1,44 @@
+[33maff7d44[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m production
+[33mbe208fc[m configuracion para produccion
+[33m4c0a3cd[m produccion
+[33mcc381fc[m se creo init
+[33mb2e7251[m produccion
+[33m87ccdd9[m cambios
+[33m4756fba[m configurado
+[33m42fc609[m configurado para despliegue
+[33m84d754d[m produccion
+[33m1f7623e[m cambios para produccion
+[33mffbccc4[m cambios produccion
+[33mb13daca[m cambios para arreglar produccion
+[33md2e7058[m cambios para produccion
+[33m561fe78[m configuraciones para despliegue
+[33m1d56d35[m cambios en build
+[33mf22da61[m proyecto configurado para despliegue
+[33m943482b[m se realizo todas las configuraciones para poner a funcionar la app de caja
+[33mb56153c[m cambios en el modulo de ventas
+[33mb1023bc[m se creo la app caja
+[33m8bbc889[m creacion de la app configuracion y auditoria
+[33mef0a0fd[m cambios app usuarios
+[33mb475977[m app auditoria lista
+[33m8030698[m se creo la app de auditorias
+[33m8106a07[m cambios en app ventas y dashboard
+[33m34bf7c3[m cambios en modulo ventas
+[33mbf18068[m realice cambios nuevas app creadas categoria y productos
+[33mee8def3[m se creo toda la API de la app configuracion
+[33mab64901[m cambios en la app clientes
+[33m0d9f799[m cambios en ele modelo de la app compras para agregar hora y fecha
+[33md08c211[m se creo la app dashboard
+[33m6649bda[m Realice cambios en la app inventario para poder que el backen cree el codigo de producto
+[33m6f9b328[m cree la app documentos para poder imprimir o descar pdfs
+[33m463442e[m cambios en la app compras cambie de proveedor a proveedor_id
+[33m46bd583[m realice cambio a la app compras
+[33m2cf75e8[m realice cambios en la API de proveedor para usar estado y no activo
+[33mbd8b2e7[m app proveedor
+[33m805eaf1[m pequeño cambio en la app inventario
+[33m892a0a7[m Cree la API de Clientes
+[33m0ecaeaa[m cree la API de compras
+[33m8c0041d[m cree la API de ventas
+[33m6e409d9[m cree la carpeta settings para modularizar archivos para no tener un solo archivo settings.py con todas las configuraciones
+[33m9ba141e[m cree la API de inventario
+[33m2f7e568[m cree la carpeta permissions con todos sus archivos
+[33m115a6bd[m Confirmación inicial - Estructura base de ERP Django
