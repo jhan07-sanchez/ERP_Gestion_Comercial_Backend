@@ -64,6 +64,7 @@ from apps.usuarios.permissions import (
     EsSupervisor,
     EsCajero,
 )
+from apps.caja.utils.idempotency import require_idempotency_key
 
 logger = logging.getLogger("caja")
 
@@ -332,6 +333,7 @@ class SesionCajaViewSet(viewsets.ReadOnlyModelViewSet):
     # ── Cierre ────────────────────────────────────────────────────────────────
 
     @action(detail=True, methods=["post"])
+    @require_idempotency_key
     def cerrar(self, request, pk=None):
         """
         POST /api/caja/sesiones/{id}/cerrar/
@@ -373,6 +375,7 @@ class SesionCajaViewSet(viewsets.ReadOnlyModelViewSet):
     # ── Movimiento manual ─────────────────────────────────────────────────────
 
     @action(detail=True, methods=["post"])
+    @require_idempotency_key
     def movimiento(self, request, pk=None):
         """
         POST /api/caja/sesiones/{id}/movimiento/
@@ -417,6 +420,7 @@ class SesionCajaViewSet(viewsets.ReadOnlyModelViewSet):
     # ── Arqueo ────────────────────────────────────────────────────────────────
 
     @action(detail=True, methods=["post"])
+    @require_idempotency_key
     def arqueo(self, request, pk=None):
         """
         POST /api/caja/sesiones/{id}/arqueo/

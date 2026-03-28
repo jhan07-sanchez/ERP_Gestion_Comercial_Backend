@@ -77,16 +77,18 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 # ==========
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Middleware de Auditoría ERP (Seguridad y Errores)
-    'apps.auditorias.middleware.AuditoriaMiddleware',
+    "apps.auditorias.middleware.AuditoriaMiddleware",
+    # --- MIDDLEWARE DE CIERRE AUTOMÁTICO DE SESIÓN ---
+    "apps.core.middleware.session_timeout.SessionTimeoutMiddleware",
 ]
 
 
@@ -200,3 +202,10 @@ LOGGING = {
         },
     },
 }
+
+
+# 1 hora = 3600 segundos
+SESSION_COOKIE_AGE = 3600
+# Obliga a Django a guardar la sesión en cada request,
+# actualizando así el tiempo de expiración automáticamente en la base de datos/caché
+SESSION_SAVE_EVERY_REQUEST = True
