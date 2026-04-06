@@ -287,6 +287,30 @@ class CompraService:
                 request=None
             )
             
+            # --- NUEVA LÓGICA DE ACTUALIZACIÓN DE INVENTARIO ---
+            # Si se registra un pago (incluso a crédito), evaluamos si ya se entregó el stock
+            entradas_existentes = MovimientoInventario.objects.filter(
+                referencia__startswith=compra.numero_compra,
+                tipo_movimiento="ENTRADA"
+            ).exists()
+
+            if not entradas_existentes:
+                for detalle in compra.detalles.all():
+                    inventario, _ = Inventario.objects.get_or_create(
+                        producto=detalle.producto, defaults={"stock_actual": 0}
+                    )
+                    inventario.stock_actual += detalle.cantidad
+                    inventario.save()
+                    MovimientoInventario.objects.create(
+                        producto=detalle.producto,
+                        tipo_movimiento="ENTRADA",
+                        cantidad=detalle.cantidad,
+                        referencia=f"{compra.numero_compra} - Ingreso por compra (Pago)",
+                        usuario=usuario,
+                    )
+                logger.info(f"📦 Inventario actualizado automáticamente al registrar el primer pago de {compra.numero_compra}")
+            # --------------------------------------------------
+            
             # 3. Recalcular y actualizar estado de la compra
             nuevo_total_pagado = pagos_previos + monto_decimal
             
@@ -350,30 +374,39 @@ class CompraService:
                     f"Estado actual: {compra.estado}"
                 )
 
-            # 3. Actualizar inventario por cada detalle
-            for detalle in compra.detalles.all():
-                # Obtener o crear inventario
-                inventario, created = Inventario.objects.get_or_create(
-                    producto=detalle.producto, defaults={"stock_actual": 0}
-                )
+            # 3. Actualizar inventario (Solo si NO se ha asignado antes para evitar duplicación)
+            # Buscamos si ya existen movimientos de entrada para esta compra
+            entradas_existentes = MovimientoInventario.objects.filter(
+                referencia__startswith=compra.numero_compra,
+                tipo_movimiento="ENTRADA"
+            ).exists()
 
-                # Aumentar stock
-                inventario.stock_actual += detalle.cantidad
-                inventario.save()
-
-                # Registrar movimiento
-                MovimientoInventario.objects.create(
-                    producto=detalle.producto,
-                    tipo_movimiento="ENTRADA",
-                    cantidad=detalle.cantidad,
-                    referencia=f"{compra.numero_compra} - Confirmación de compra",
-                    usuario=usuario,
-                )
-
-                logger.debug(
-                    f"  📦 Stock actualizado: {detalle.producto.nombre} "
-                    f"+{detalle.cantidad} (Total: {inventario.stock_actual})"
-                )
+            if not entradas_existentes:
+                for detalle in compra.detalles.all():
+                    # Obtener o crear inventario
+                    inventario, created = Inventario.objects.get_or_create(
+                        producto=detalle.producto, defaults={"stock_actual": 0}
+                    )
+    
+                    # Aumentar stock
+                    inventario.stock_actual += detalle.cantidad
+                    inventario.save()
+    
+                    # Registrar movimiento
+                    MovimientoInventario.objects.create(
+                        producto=detalle.producto,
+                        tipo_movimiento="ENTRADA",
+                        cantidad=detalle.cantidad,
+                        referencia=f"{compra.numero_compra} - Confirmación de compra",
+                        usuario=usuario,
+                    )
+    
+                    logger.debug(
+                        f"  📦 Stock actualizado: {detalle.producto.nombre} "
+                        f"+{detalle.cantidad} (Total: {inventario.stock_actual})"
+                    )
+            else:
+                logger.info(f"  ⚠️ El inventario ya había sido actualizado previamente para la compra {compra.numero_compra}")
 
             # 4. Cambiar estado a COMPLETADA (solo si ya estaba pagada, lo cual es raro al confirmar)
             # Normalmente una compra confirmada pero no pagada sigue PENDIENTE de pago.
@@ -458,9 +491,14 @@ class CompraService:
             if compra.estado == "ANULADA":
                 raise CompraStateError("La compra ya está anulada.")
 
-            # 3. Si está COMPLETADA o PARCIAL, revertir inventario
-            if compra.estado in ["COMPLETADA", "PARCIAL"]:
-                logger.info(f"  🔄 Compra en estado {compra.estado}, revirtiendo inventario...")
+            # 3. Revertir inventario solo si se asignó previamente
+            entradas_existentes = MovimientoInventario.objects.filter(
+                referencia__startswith=compra.numero_compra,
+                tipo_movimiento="ENTRADA"
+            ).exists()
+
+            if entradas_existentes:
+                logger.info(f"  🔄 Revirtiendo inventario para compra {compra.numero_compra}...")
 
                 # Validar stock suficiente para cada producto
                 for detalle in compra.detalles.all():

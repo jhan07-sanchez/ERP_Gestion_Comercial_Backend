@@ -70,6 +70,18 @@ class MetodoPago(models.Model):
         default=False,
         help_text="Marcar si este método cuenta como dinero en efectivo físico",
     )
+    
+    TIPO_PAGO_CHOICES = [
+        ("CONTADO", "Contado"),
+        ("CREDITO", "Crédito"),
+    ]
+    tipo = models.CharField(
+        max_length=15, 
+        choices=TIPO_PAGO_CHOICES, 
+        default="CONTADO",
+        help_text="Impacta caja inmediatamente si es Contado, genera Cuenta por Pagar si es Crédito",
+    )
+    
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
