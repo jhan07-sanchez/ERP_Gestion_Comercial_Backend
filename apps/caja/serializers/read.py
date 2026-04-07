@@ -26,10 +26,20 @@ from apps.caja.models import MetodoPago, Caja, SesionCaja, MovimientoCaja, Arque
 
 class MetodoPagoSerializer(serializers.ModelSerializer):
     """Serializer para listar/ver métodos de pago"""
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    es_contado = serializers.BooleanField(read_only=True)
+    es_credito = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = MetodoPago
-        fields = ["id", "nombre", "activo", "es_efectivo", "fecha_creacion"]
+        fields = [
+            "id", "nombre", "activo", "es_efectivo",
+            "tipo",           # 🆕
+            "tipo_display",   # 🆕 "Contado" o "Crédito"
+            "es_contado",     # 🆕
+            "es_credito",     # 🆕
+            "fecha_creacion",
+        ]
 
 
 class MetodoPagoSimpleSerializer(serializers.ModelSerializer):
@@ -37,7 +47,7 @@ class MetodoPagoSimpleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MetodoPago
-        fields = ["id", "nombre", "es_efectivo"]
+        fields = ["id", "nombre", "es_efectivo", "tipo"]  # 🆕 tipo agregado
 
 
 # ============================================================================

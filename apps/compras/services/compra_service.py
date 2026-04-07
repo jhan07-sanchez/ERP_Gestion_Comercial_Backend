@@ -14,6 +14,7 @@ Autor: Sistema ERP
 Versión: 2.0
 Fecha: 2026-02-15
 """
+
 from apps.auditorias.services.auditoria_service import AuditoriaService
 from datetime import datetime
 import logging
@@ -23,7 +24,7 @@ from django.utils import timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from apps.compras.models import Compra, DetalleCompra, PagoCompra
+from apps.compras.models import Compra, DetalleCompra, PagoCompra, CuentaPorPagar
 from apps.productos.models import Producto
 from apps.inventario.models import Inventario, MovimientoInventario
 from apps.proveedores.models import Proveedor
@@ -138,9 +139,9 @@ class CompraService:
 
             if isinstance(fecha, datetime) is False:
                 fecha = timezone.make_aware(
-                datetime.combine(fecha, datetime.min.time())
-            )
-            
+                    datetime.combine(fecha, datetime.min.time())
+                )
+
             # 3. Calcular el total y validar productos
             total = Decimal("0.00")
             productos_validados = []
@@ -194,8 +195,8 @@ class CompraService:
             # ✅ REGISTRAR AUDITORÍA CORRECTAMENTE
             AuditoriaService.registrar_accion(
                 usuario=usuario,
-                accion='CREAR',
-                modulo='COMPRAS',
+                accion="CREAR",
+                modulo="COMPRAS",
                 objeto=compra,
                 descripcion=f"Compra #{compra.numero_compra} creada",
                 request=request,
@@ -209,7 +210,7 @@ class CompraService:
                     cantidad=item["cantidad"],
                     precio_compra=item["precio_compra"],
                 )
-            
+
             logger.info(
                 f"✅ Compra {compra.numero_compra} creada exitosamente. "
                 f"Total: ${total}, Productos: {len(productos_validados)}"
@@ -231,67 +232,101 @@ class CompraService:
     @staticmethod
     @transaction.atomic
     def registrar_pago(compra_id, monto, metodo_pago, usuario, referencia=None):
-        """
-        Registra un pago parcial o total para una compra.
-        Actualiza el estado de la compra y aumenta el inventario si es el primer pago.
-        """
         try:
-            compra = Compra.objects.prefetch_related('detalles__producto').get(id=compra_id)
-            
-            if compra.estado == 'ANULADA':
-                raise CompraStateError('No se pueden registrar pagos a una compra anulada.')
-                
-            pagos_previos = compra.pagos.aggregate(total=Sum('monto'))['total'] or Decimal('0.00')
-            saldo_pendiente = compra.total - Decimal(str(pagos_previos))
+            compra = (
+                Compra.objects.prefetch_related("detalles__producto", "pagos")
+                .select_related("proveedor")
+                .get(id=compra_id)
+            )
+
+            if compra.estado == "ANULADA":
+                raise CompraStateError(
+                    "No se pueden registrar pagos a una compra anulada."
+                )
+
+            pagos_previos = compra.pagos.aggregate(total=Sum("monto"))[
+                "total"
+            ] or Decimal("0.00")
+            saldo_pendiente_compra = compra.total - Decimal(str(pagos_previos))
             monto_decimal = Decimal(str(monto))
-            
+
             if monto_decimal <= 0:
-                raise ValueError('El monto debe ser mayor a 0.')
-                
-            if monto_decimal > saldo_pendiente:
-                raise ValueError(f'El monto excede el saldo pendiente. Saldo actual: {saldo_pendiente}')
-            # Mapear el string metodo_pago al modelo MetodoPago de Caja
-            # Buscamos de forma case-insensitive, si no existe usamos el primero disponible
-            metodo_caja = MetodoPago.objects.filter(nombre__iexact=metodo_pago, activo=True).first()
-            if not metodo_caja:
-                metodo_caja = MetodoPago.objects.filter(activo=True).first()
-                
-            if not metodo_caja:
-                raise CompraError("No hay métodos de pago activos en Caja para registrar el egreso.")
-            
-            # 1. Registrar el pago
+                raise ValueError("El monto debe ser mayor a 0.")
+
+            if monto_decimal > saldo_pendiente_compra:
+                raise ValueError(
+                    f"El monto excede el saldo pendiente. "
+                    f"Saldo actual: ${saldo_pendiente_compra:,.0f}"
+                )
+
+            from apps.caja.models import MetodoPago
+
+            metodo_obj = MetodoPago.objects.filter(
+                nombre__iexact=metodo_pago, activo=True
+            ).first()
+
+            if not metodo_obj:
+                metodo_obj = MetodoPago.objects.filter(
+                    activo=True, tipo=MetodoPago.TIPO_CONTADO
+                ).first()
+
+            if not metodo_obj:
+                raise CompraError(
+                    "No hay métodos de pago activos configurados en el sistema."
+                )
+
+            logger.info(
+                f"💳 Registrando pago de ${monto_decimal:,.0f} "
+                f"para compra {compra.numero_compra} "
+                f"con método '{metodo_obj.nombre}' (tipo: {metodo_obj.tipo})"
+            )
+
+            # ── CONTADO ─────────────────────────────
+            if metodo_obj.es_contado:
+                from apps.caja.services.caja_control import CajaControlService
+                from apps.caja.services.caja_service import (
+                    CajaService as CajaServiceInternal,
+                )
+
+                sesion = CajaControlService.verificar_caja_abierta(usuario)
+
+                saldo_caja = sesion.saldo_esperado
+                if monto_decimal > saldo_caja:
+                    raise CompraValidationError(
+                        f"Fondos insuficientes en caja. "
+                        f"Saldo disponible: ${saldo_caja:,.0f}. "
+                        f"Monto requerido: ${monto_decimal:,.0f}."
+                    )
+
+                CajaServiceInternal.registrar_pago_compra(
+                    compra=compra,
+                    usuario=usuario,
+                    metodo_pago_id=metodo_obj.id,
+                    monto=monto_decimal,
+                )
+
+            # ── CRÉDITO ─────────────────────────────
+            elif metodo_obj.es_credito:
+                cpp = CompraService._gestionar_cuenta_por_pagar(
+                    compra=compra,
+                    monto=monto_decimal,
+                    usuario=usuario,
+                )
+
+            # ── CREAR PAGO ──────────────────────────
             pago = PagoCompra.objects.create(
                 compra=compra,
                 monto=monto_decimal,
-                metodo_pago=metodo_pago,
+                metodo_pago=metodo_obj.nombre,  # 🔥 corregido
                 referencia=referencia,
-                usuario=usuario
+                usuario=usuario,
             )
 
-            # REGLA ERP: Llamar a la caja y registrar el egreso
-            # Esto fallará si el usuario no tiene caja abierta (CajaCerradaOperacionError)
-            CajaService.registrar_pago_compra(
-                compra=compra,
-                usuario=usuario,
-                metodo_pago_id=metodo_caja.id,
-                monto=monto_decimal
-            )
-            
-            # 2. Registrar Auditoría del Pago
-            AuditoriaService.registrar_accion(
-                usuario=usuario,
-                accion='ACTUALIZAR',
-                modulo='COMPRAS',
-                objeto=compra,
-                descripcion=f"Pago de ${monto_decimal} registrado para {compra.numero_compra}",
-                request=None
-            )
-            
-            # --- NUEVA LÓGICA DE ACTUALIZACIÓN DE INVENTARIO ---
-            # Si se registra un pago (incluso a crédito), evaluamos si ya se entregó el stock
+            # ── INVENTARIO (PRIMER PAGO) ────────────
+            from apps.inventario.models import Inventario, MovimientoInventario
+
             entradas_existentes = MovimientoInventario.objects.filter(
-                referencia__startswith=compra.numero_compra,
-                tipo_movimiento="ENTRADA"
+                referencia__startswith=compra.numero_compra, tipo_movimiento="ENTRADA"
             ).exists()
 
             if not entradas_existentes:
@@ -299,8 +334,10 @@ class CompraService:
                     inventario, _ = Inventario.objects.get_or_create(
                         producto=detalle.producto, defaults={"stock_actual": 0}
                     )
+
                     inventario.stock_actual += detalle.cantidad
                     inventario.save()
+
                     MovimientoInventario.objects.create(
                         producto=detalle.producto,
                         tipo_movimiento="ENTRADA",
@@ -308,28 +345,88 @@ class CompraService:
                         referencia=f"{compra.numero_compra} - Ingreso por compra (Pago)",
                         usuario=usuario,
                     )
-                logger.info(f"📦 Inventario actualizado automáticamente al registrar el primer pago de {compra.numero_compra}")
-            # --------------------------------------------------
-            
-            # 3. Recalcular y actualizar estado de la compra
+
+                logger.info(
+                    f"📦 Inventario actualizado automáticamente "
+                    f"para la compra {compra.numero_compra}"
+                )
+
+            # ── AUDITORÍA ───────────────────────────
+            AuditoriaService.registrar_accion(
+                usuario=usuario,
+                accion="ACTUALIZAR",
+                modulo="COMPRAS",
+                objeto=compra,
+                descripcion=(
+                    f"Pago ${monto_decimal:,.0f} [{metodo_obj.tipo}] "
+                    f"registrado para {compra.numero_compra}"
+                ),
+                request=None,
+            )
+
+            # ── ESTADO COMPRA ───────────────────────
             nuevo_total_pagado = pagos_previos + monto_decimal
-            
             if nuevo_total_pagado >= compra.total:
-                compra.estado = 'COMPLETADA'
+                compra.estado = "COMPLETADA"
             else:
-                compra.estado = 'PARCIAL'
-                
+                compra.estado = "PARCIAL"
+
             compra.save()
-            
-            logger.info(f"✅ Pago de ${monto_decimal} registrado para compra ID: {compra_id}")
+
+            logger.info(
+                f"✅ Pago registrado. Compra {compra.numero_compra} → estado: {compra.estado}"
+            )
+
             return pago
-            
+
         except Compra.DoesNotExist:
             raise CompraError(f"La compra con ID {compra_id} no existe.")
+        except (CompraValidationError, CompraStateError, ValueError):
+            raise
         except Exception as e:
-            logger.error(f"❌ Error al registrar pago para la compra: {str(e)}")
+            logger.error(
+                f"❌ Error al registrar pago para compra {compra_id}: {str(e)}"
+            )
             raise CompraError(f"Error al registrar el pago: {str(e)}")
 
+    @staticmethod
+    def _gestionar_cuenta_por_pagar(
+        compra, monto: Decimal, usuario
+    ) -> "CuentaPorPagar":
+        """
+        Crea o actualiza la CuentaPorPagar cuando se registra un pago a crédito.
+
+        Lógica:
+        - Si no existe CPP para esta compra → crearla con monto_total = compra.total
+        - Si ya existe → reducir saldo_pendiente en `monto`
+        - Actualizar estado según saldo restante
+
+        Returns:
+            CuentaPorPagar: La cuenta creada o actualizada
+        """
+        from apps.compras.models import CuentaPorPagar
+
+        cpp, created = CuentaPorPagar.objects.get_or_create(
+            compra=compra,
+            defaults={
+                "proveedor": compra.proveedor,
+                "monto_total": compra.total,
+                "saldo_pendiente": compra.total,
+                "estado": CuentaPorPagar.ESTADO_PENDIENTE,
+            },
+        )
+
+        if not created:
+            # Ya existe → reducir saldo
+            cpp.saldo_pendiente = max(Decimal("0.00"), cpp.saldo_pendiente - monto)
+            if cpp.saldo_pendiente <= Decimal("0.00"):
+                cpp.estado = CuentaPorPagar.ESTADO_PAGADO
+                cpp.saldo_pendiente = Decimal("0.00")
+            else:
+                cpp.estado = CuentaPorPagar.ESTADO_PARCIAL
+            cpp.save()
+
+        return cpp
 
     # ========================================================================
     # CONFIRMAR COMPRA (SIN PAGO, COMPLETAR MANUALMENTE)
@@ -377,8 +474,7 @@ class CompraService:
             # 3. Actualizar inventario (Solo si NO se ha asignado antes para evitar duplicación)
             # Buscamos si ya existen movimientos de entrada para esta compra
             entradas_existentes = MovimientoInventario.objects.filter(
-                referencia__startswith=compra.numero_compra,
-                tipo_movimiento="ENTRADA"
+                referencia__startswith=compra.numero_compra, tipo_movimiento="ENTRADA"
             ).exists()
 
             if not entradas_existentes:
@@ -387,11 +483,11 @@ class CompraService:
                     inventario, created = Inventario.objects.get_or_create(
                         producto=detalle.producto, defaults={"stock_actual": 0}
                     )
-    
+
                     # Aumentar stock
                     inventario.stock_actual += detalle.cantidad
                     inventario.save()
-    
+
                     # Registrar movimiento
                     MovimientoInventario.objects.create(
                         producto=detalle.producto,
@@ -400,40 +496,44 @@ class CompraService:
                         referencia=f"{compra.numero_compra} - Confirmación de compra",
                         usuario=usuario,
                     )
-    
+
                     logger.debug(
                         f"  📦 Stock actualizado: {detalle.producto.nombre} "
                         f"+{detalle.cantidad} (Total: {inventario.stock_actual})"
                     )
             else:
-                logger.info(f"  ⚠️ El inventario ya había sido actualizado previamente para la compra {compra.numero_compra}")
+                logger.info(
+                    f"  ⚠️ El inventario ya había sido actualizado previamente para la compra {compra.numero_compra}"
+                )
 
             # 4. Cambiar estado a COMPLETADA (solo si ya estaba pagada, lo cual es raro al confirmar)
             # Normalmente una compra confirmada pero no pagada sigue PENDIENTE de pago.
             # Sin embargo, para no romper el flujo actual, la dejaremos en PENDIENTE si no hay pagos.
             # Si el usuario quiere que 'Confirmar' no signifique 'Pagado', cambiamos esto:
             # compra.estado = "COMPLETADA" # <-- Esto estaba marcando como pagada sin pagar.
-            
+
             # REGLA ERP: Confirmar = Recibir mercadería. El estado financiero depende de los pagos.
             # Si no hay pagos, el estado debe ser PENDIENTE. Si hay parciales, PARCIAL.
-            pagos_totales = compra.pagos.aggregate(total=Sum('monto'))['total'] or Decimal('0.00')
+            pagos_totales = compra.pagos.aggregate(total=Sum("monto"))[
+                "total"
+            ] or Decimal("0.00")
             if pagos_totales >= compra.total:
                 compra.estado = "COMPLETADA"
             elif pagos_totales > 0:
                 compra.estado = "PARCIAL"
             else:
                 compra.estado = "PENDIENTE"
-                
+
             compra.save()
 
             # Auditoría
             AuditoriaService.registrar_accion(
                 usuario=usuario,
-                accion='ACTUALIZAR',
-                modulo='COMPRAS',
+                accion="ACTUALIZAR",
+                modulo="COMPRAS",
                 objeto=compra,
                 descripcion=f"Compra confirmada: {compra.numero_compra}",
-                request=None # No hay request en el contexto del servicio directo
+                request=None,  # No hay request en el contexto del servicio directo
             )
 
             return compra
@@ -493,12 +593,13 @@ class CompraService:
 
             # 3. Revertir inventario solo si se asignó previamente
             entradas_existentes = MovimientoInventario.objects.filter(
-                referencia__startswith=compra.numero_compra,
-                tipo_movimiento="ENTRADA"
+                referencia__startswith=compra.numero_compra, tipo_movimiento="ENTRADA"
             ).exists()
 
             if entradas_existentes:
-                logger.info(f"  🔄 Revirtiendo inventario para compra {compra.numero_compra}...")
+                logger.info(
+                    f"  🔄 Revirtiendo inventario para compra {compra.numero_compra}..."
+                )
 
                 # Validar stock suficiente para cada producto
                 for detalle in compra.detalles.all():
@@ -547,11 +648,11 @@ class CompraService:
             # Auditoría
             AuditoriaService.registrar_accion(
                 usuario=usuario,
-                accion='ELIMINAR', # Usamos ELIMINAR para anulación
-                modulo='COMPRAS',
+                accion="ELIMINAR",  # Usamos ELIMINAR para anulación
+                modulo="COMPRAS",
                 objeto=compra,
                 descripcion=f"Compra anulada: {compra.numero_compra}. Motivo: {motivo}",
-                request=None
+                request=None,
             )
 
             return compra

@@ -57,6 +57,14 @@ class MetodoPago(models.Model):
     - Nequi / Daviplata
     """
 
+    TIPO_CONTADO = "CONTADO"
+    TIPO_CREDITO = "CREDITO"
+
+    TIPO_CHOICES = [
+        (TIPO_CONTADO, "Contado"),
+        (TIPO_CREDITO, "Crédito"),
+    ]
+
     nombre = models.CharField(
         max_length=50,
         unique=True,
@@ -70,18 +78,16 @@ class MetodoPago(models.Model):
         default=False,
         help_text="Marcar si este método cuenta como dinero en efectivo físico",
     )
-    
-    TIPO_PAGO_CHOICES = [
-        ("CONTADO", "Contado"),
-        ("CREDITO", "Crédito"),
-    ]
+    #NUEVO CAMPO: tipo de pago (Contado vs Crédito)
     tipo = models.CharField(
-        max_length=15, 
-        choices=TIPO_PAGO_CHOICES, 
-        default="CONTADO",
-        help_text="Impacta caja inmediatamente si es Contado, genera Cuenta por Pagar si es Crédito",
+        max_length=10,
+        choices=TIPO_CHOICES,
+        default=TIPO_CONTADO,
+        help_text=(
+            "CONTADO: requiere saldo en caja y genera egreso inmediato. "
+            "CREDITO: no afecta caja y genera una Cuenta por Pagar al proveedor."
+        ),
     )
-    
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -90,7 +96,15 @@ class MetodoPago(models.Model):
         ordering = ["nombre"]
 
     def __str__(self):
-        return self.nombre
+        return f"{self.nombre} ({self.get_tipo_display()})"
+
+    @property
+    def es_contado(self) -> bool:
+        return self.tipo == self.TIPO_CONTADO
+
+    @property
+    def es_credito(self) -> bool:
+        return self.tipo == self.TIPO_CREDITO
 
 
 # ============================================================================

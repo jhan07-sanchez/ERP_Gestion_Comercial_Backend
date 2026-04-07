@@ -142,3 +142,99 @@ class PagoCompra(models.Model):
     def __str__(self):
         return f"Pago #{self.id} de Compra #{self.compra.numero_compra} - ${self.monto}"
 
+
+
+
+class CuentaPorPagar(models.Model):
+    """
+    Registro de deuda con un proveedor generada por una compra a crédito.
+
+    Flujo:
+    1. Se registra pago con método tipo=CREDITO
+    2. Se crea esta CuentaPorPagar automáticamente
+    3. Cuando el proveedor cobra, se registra el pago real (CONTADO)
+       y se reduce saldo_pendiente
+
+    Estados:
+    - PENDIENTE  → No se ha abonado nada
+    - PARCIAL    → Se han hecho abonos pero queda saldo
+    - PAGADO     → Saldo en cero, deuda cancelada
+    """
+
+    ESTADO_PENDIENTE = "PENDIENTE"
+    ESTADO_PARCIAL = "PARCIAL"
+    ESTADO_PAGADO = "PAGADO"
+
+    ESTADO_CHOICES = [
+        (ESTADO_PENDIENTE, "Pendiente"),
+        (ESTADO_PARCIAL, "Parcial"),
+        (ESTADO_PAGADO, "Pagado"),
+    ]
+
+    compra = models.ForeignKey(
+        Compra,
+        on_delete=models.PROTECT,
+        related_name="cuentas_por_pagar",
+        help_text="Compra que originó esta deuda",
+    )
+    proveedor = models.ForeignKey(
+        Proveedor,
+        on_delete=models.PROTECT,
+        related_name="cuentas_por_pagar",
+        help_text="Proveedor al que se le debe",
+    )
+    monto_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Monto original de la deuda",
+    )
+    saldo_pendiente = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Cuánto falta por pagar",
+    )
+    estado = models.CharField(
+        max_length=10,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_PENDIENTE,
+        db_index=True,
+    )
+    fecha_vencimiento = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Fecha límite de pago acordada con el proveedor (opcional)",
+    )
+    notas = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Notas adicionales sobre la deuda",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "cuentas_por_pagar"
+        verbose_name = "Cuenta por Pagar"
+        verbose_name_plural = "Cuentas por Pagar"
+        ordering = ["-fecha_creacion"]
+        indexes = [
+            models.Index(fields=["proveedor", "estado"]),
+            models.Index(fields=["estado", "fecha_vencimiento"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"CPP #{self.id} — {self.proveedor.nombre} "
+            f"— Saldo: ${self.saldo_pendiente:,.0f} ({self.estado})"
+        )
+
+    @property
+    def esta_pagada(self) -> bool:
+        return self.estado == self.ESTADO_PAGADO
+
+    @property
+    def porcentaje_pagado(self) -> float:
+        if self.monto_total == 0:
+            return 100.0
+        pagado = float(self.monto_total - self.saldo_pendiente)
+        return round((pagado / float(self.monto_total)) * 100, 2)

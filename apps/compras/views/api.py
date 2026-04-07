@@ -44,6 +44,7 @@ from apps.compras.services import (
     CompraService,
     CompraError,
     CompraStateError,
+    CompraValidationError,
     InventarioInsuficienteError,
 )
 from apps.usuarios.permissions import (
@@ -161,10 +162,21 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
         """Permisos según la acción"""
         if self.action in ["list", "retrieve"]:
             permission_classes = [IsAuthenticated, EsAlmacenista]
-        elif self.action in ["create", "update", "partial_update", "registrar_pago"]:
+
+        elif self.action in ["create", "update", "partial_update"]:
+            # Crear/editar compra SÍ requiere caja abierta (es operación financiera)
             permission_classes = [IsAuthenticated, PuedeGestionarCompras, CajaAbiertaPermission]
+
+        elif self.action == "registrar_pago":
+            # ⚠️ NO requiere CajaAbiertaPermission aquí.
+            # El service valida internamente:
+            # - CONTADO → verifica caja abierta Y saldo suficiente
+            # - CRÉDITO → no necesita caja abierta
+            permission_classes = [IsAuthenticated, PuedeGestionarCompras]
+
         elif self.action in ["destroy", "confirmar", "anular"]:
             permission_classes = [IsAuthenticated, EsSupervisor, CajaAbiertaPermission]
+
         else:
             permission_classes = [IsAuthenticated]
 
@@ -375,57 +387,64 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
     def registrar_pago(self, request, pk=None):
         """
         Registrar un pago a una compra.
-        
         POST /api/compras/{id}/registrar_pago/
+
+        El comportamiento depende del tipo del método de pago:
+        - CONTADO: valida saldo en caja → registra egreso automático
+        - CRÉDITO: crea Cuenta por Pagar → no afecta caja
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         try:
-            # Reutilizamos CompraService.registrar_pago
             pago = CompraService.registrar_pago(
                 compra_id=pk,
                 monto=serializer.validated_data["monto"],
                 metodo_pago=serializer.validated_data["metodo_pago"],
                 usuario=request.user,
-                referencia=serializer.validated_data.get("referencia", "")
+                referencia=serializer.validated_data.get("referencia", ""),
             )
-            
-            # Recargar la compra para devolver los datos actualizados
+
             compra = self.get_object()
             response_serializer = CompraDetailSerializer(compra)
-            
+
             return Response(
                 {
                     "success": True,
-                    "message": f"Pago de ${pago.monto} registrado exitosamente",
+                    "message": f"Pago de ${pago.monto:,.0f} registrado exitosamente",
+                    "tipo_pago": pago.metodo_pago,
                     "data": response_serializer.data,
                 },
-                status=status.HTTP_201_CREATED
+                status=status.HTTP_201_CREATED,
             )
-            
-        except ValueError as e:
+
+        except CompraValidationError as e:
+            # Incluye "Fondos insuficientes en caja"
             return Response(
-                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {"success": False, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except CompraStateError as e:
             return Response(
-                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {"success": False, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        except CompraError as e:
+        except ValueError as e:
             return Response(
-                {"success": False, "error": str(e)}, status=status.HTTP_400_BAD_REQUEST
+                {"success": False, "error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
             from apps.caja.services.caja_control import CajaCerradaOperacionError
             if isinstance(e, CajaCerradaOperacionError):
                 return Response(
-                    {"success": False, "error": str(e)}, status=status.HTTP_403_FORBIDDEN
+                    {"success": False, "error": str(e)},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            logger.error(f"Error inesperado al registrar pago de compra: {str(e)}")
+            logger.error(f"Error inesperado en registrar_pago: {str(e)}")
             return Response(
                 {"success": False, "error": "Error interno del servidor"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     # ========================================================================
