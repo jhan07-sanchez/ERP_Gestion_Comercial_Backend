@@ -58,7 +58,13 @@ from .services import (
     generar_reporte_ventas,
     generar_reporte_compras,
     generar_reporte_inventario,
+    DocumentoService,
 )
+from .serializers import (
+    DocumentoListSerializer,
+    DocumentoDetailSerializer,
+)
+from .models import Documento
 
 logger = logging.getLogger("documentos")
 
@@ -152,23 +158,26 @@ class CompraDocumentoView(APIView):
         empresa = _empresa_desde_request(request)
 
         try:
-            pdf_buffer = generar_pdf_compra(compra, empresa)
+            # Asegurar persistencia (Get o Create)
+            documento = DocumentoService.obtener_o_crear_desde_compra(compra, request.user)
+            
+            pdf_buffer = generar_pdf_compra(documento, empresa)
             
             # Auditoría
             AuditoriaService.registrar_accion(
                 usuario=request.user,
                 accion='DESCARGAR',
                 modulo='DOCUMENTOS',
-                objeto=compra,
-                descripcion=f"PDF de Compra generado: {compra.numero_compra}",
+                objeto=documento,
+                descripcion=f"PDF de Compra generado: {documento.numero_interno}",
                 request=request
             )
 
             logger.info(
-                f"✅ PDF Compra {compra.numero_compra} generado por {request.user}"
+                f"✅ PDF Compra {documento.numero_interno} generado por {request.user}"
             )
             return _response_pdf(
-                pdf_buffer, filename=f"compra_{compra.numero_compra}.pdf"
+                pdf_buffer, filename=f"compra_{documento.numero_interno}.pdf"
             )
 
         except Exception as e:
@@ -216,22 +225,23 @@ class VentaFacturaView(APIView):
         empresa = _empresa_desde_request(request)
 
         try:
-            pdf_buffer = generar_pdf_factura(venta, empresa)
-            numero = getattr(venta, "numero_venta", f"VT{venta.id:05d}")
-            prefijo = empresa.get("prefijo_factura", "FV")
+            # Asegurar persistencia (Get o Create)
+            documento = DocumentoService.obtener_o_crear_desde_venta(venta, request.user)
+            
+            pdf_buffer = generar_pdf_factura(documento, empresa)
             
             # Auditoría
             AuditoriaService.registrar_accion(
                 usuario=request.user,
                 accion='DESCARGAR',
                 modulo='DOCUMENTOS',
-                objeto=venta,
-                descripcion=f"Factura de Venta generada: {prefijo}{numero}",
+                objeto=documento,
+                descripcion=f"Factura de Venta generada: {documento.numero_interno}",
                 request=request
             )
 
-            logger.info(f"✅ Factura {prefijo}{numero} generada por {request.user}")
-            return _response_pdf(pdf_buffer, filename=f"factura_{prefijo}{numero}.pdf")
+            logger.info(f"✅ Factura {documento.numero_interno} generada por {request.user}")
+            return _response_pdf(pdf_buffer, filename=f"factura_{documento.numero_interno}.pdf")
 
         except Exception as e:
             logger.error(f"❌ Error generando factura venta {pk}: {e}")
@@ -273,10 +283,12 @@ class VentaReciboPosView(APIView):
         empresa = _empresa_desde_request(request)
 
         try:
-            pdf_buffer = generar_recibo_pos(venta, empresa)
-            numero = getattr(venta, "numero_venta", venta.id)
-            logger.info(f"✅ Recibo POS {numero} generado por {request.user}")
-            return _response_pdf(pdf_buffer, filename=f"recibo_pos_{numero}.pdf")
+            # Asegurar persistencia (Get o Create)
+            documento = DocumentoService.obtener_o_crear_desde_venta(venta, request.user)
+            
+            pdf_buffer = generar_recibo_pos(documento, empresa)
+            logger.info(f"✅ Recibo POS {documento.numero_interno} generado por {request.user}")
+            return _response_pdf(pdf_buffer, filename=f"recibo_pos_{documento.numero_interno}.pdf")
 
         except Exception as e:
             logger.error(f"❌ Error generando recibo POS venta {pk}: {e}")
@@ -403,4 +415,80 @@ class ReporteInventarioView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-# Create your views here.
+# ============================================================================
+# MÓDULO CENTRALIZADO DE DOCUMENTOS
+# ============================================================================
+
+from rest_framework import viewsets
+from rest_framework.decorators import action
+
+
+class DocumentoViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet centralizado para consulta de documentos (Facturas, Recibos, Compras).
+    """
+    queryset = Documento.objects.select_related(
+        "venta__cliente", 
+        "compra__proveedor", 
+        "usuario"
+    ).prefetch_related("lineas").all()
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return DocumentoListSerializer
+        return DocumentoDetailSerializer
+
+    def get_queryset(self):
+        """Aplicar filtros por tipo, venta o compra."""
+        qs = super().get_queryset()
+        tipo = self.request.query_params.get("tipo")
+        venta_id = self.request.query_params.get("venta_id")
+        compra_id = self.request.query_params.get("compra_id")
+
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+        if venta_id:
+            qs = qs.filter(venta_id=venta_id)
+        if compra_id:
+            qs = qs.filter(compra_id=compra_id)
+
+        return qs
+
+    @action(detail=True, methods=["get", "post"], url_path="pdf")
+    def generar_pdf(self, request, pk=None):
+        """Genera el PDF del documento específico."""
+        documento = self.get_object()
+        empresa = _empresa_desde_request(request)
+
+        try:
+            if documento.tipo in [Documento.TipoDocumento.FACTURA_VENTA]:
+                pdf_buffer = generar_pdf_factura(documento, empresa)
+            elif documento.tipo == Documento.TipoDocumento.TICKET_POS:
+                pdf_buffer = generar_recibo_pos(documento, empresa)
+            elif documento.tipo == Documento.TipoDocumento.FACTURA_COMPRA:
+                pdf_buffer = generar_pdf_compra(documento, empresa)
+            else:
+                return Response(
+                    {"error": "Tipo de documento no soportado para PDF."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Auditoría
+            AuditoriaService.registrar_accion(
+                usuario=request.user,
+                accion='DESCARGAR',
+                modulo='DOCUMENTOS',
+                objeto=documento,
+                descripcion=f"PDF de {documento.get_tipo_display()} generado vía Módulo Central",
+                request=request
+            )
+
+            return _response_pdf(pdf_buffer, filename=f"{documento.numero_interno}.pdf")
+
+        except Exception as e:
+            logger.error(f"❌ Error generando PDF desde módulo central ({documento.id}): {e}")
+            return Response(
+                {"error": f"Error al generar PDF: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

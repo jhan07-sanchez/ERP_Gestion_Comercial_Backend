@@ -1,6 +1,6 @@
 # apps/documentos/services/__init__.py
 """
-📦 MÓDULO DE SERVICIOS - DOCUMENTOS ERP
+📦 MÓDULO DE SERVICIOS - DOCUMENTOS ERP — Versión Empresarial
 """
 
 from .pdf_compra import generar_pdf_compra
@@ -17,6 +17,8 @@ from .utils import (
     formatear_fecha,
     numero_a_letras,
 )
+from .documento_service import DocumentoService
+from .numeracion_service import NumeracionService
 
 __all__ = [
     "generar_pdf_compra",
@@ -29,4 +31,6 @@ __all__ = [
     "generar_codigo_barras",
     "formatear_fecha",
     "numero_a_letras",
+    "DocumentoService",
+    "NumeracionService",
 ]

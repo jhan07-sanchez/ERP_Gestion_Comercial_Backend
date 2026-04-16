@@ -238,6 +238,9 @@ class VentaDetailSerializer(serializers.ModelSerializer):
     total_productos = serializers.SerializerMethodField()
     total_unidades = serializers.SerializerMethodField()
 
+    # Documento ERP emitido automáticamente (opcional en respuesta JSON)
+    documento = serializers.SerializerMethodField()
+
     class Meta:
         model = Venta
         fields = [
@@ -260,7 +263,8 @@ class VentaDetailSerializer(serializers.ModelSerializer):
             'pagos',
             'total_productos',
             'total_unidades',
-            'fecha'
+            'fecha',
+            'documento',
         ]
 
     def get_estado_badge(self, obj):
@@ -316,6 +320,11 @@ class VentaDetailSerializer(serializers.ModelSerializer):
         from django.db.models import Sum
         total = obj.detalles.aggregate(total=Sum('cantidad'))['total']
         return total or 0
+
+    def get_documento(self, obj):
+        from apps.documentos.serializers_resumen import resumen_documento_venta
+
+        return resumen_documento_venta(obj.id)
 
 
 class VentaSimpleSerializer(serializers.ModelSerializer):

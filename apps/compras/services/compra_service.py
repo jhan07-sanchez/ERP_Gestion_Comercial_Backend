@@ -365,17 +365,42 @@ class CompraService:
             )
 
             # ── ESTADO COMPRA ───────────────────────
-            nuevo_total_pagado = pagos_previos + monto_decimal
-            if nuevo_total_pagado >= compra.total:
+            # Solo los pagos de CONTADO cuentan para marcar como COMPLETADA
+            pagos_contado = compra.pagos.filter(
+                metodo_pago__in=MetodoPago.objects.filter(tipo=MetodoPago.TIPO_CONTADO).values_list('nombre', flat=True)
+            ).aggregate(total=Sum("monto"))["total"] or Decimal("0.00")
+
+            nuevo_total_contado = pagos_contado + (monto_decimal if metodo_obj.es_contado else Decimal("0.00"))
+            
+            if nuevo_total_contado >= compra.total:
                 compra.estado = "COMPLETADA"
             else:
+                # Si hay cualquier tipo de pago (contado o crédito), es al menos PARCIAL
                 compra.estado = "PARCIAL"
 
             compra.save()
 
             logger.info(
-                f"✅ Pago registrado. Compra {compra.numero_compra} → estado: {compra.estado}"
+                f"✅ Pago registrado. Compra {compra.numero_compra} → estado: {compra.estado} "
+                f"(Pagado contado: ${nuevo_total_contado:,.0f})"
             )
+
+            # Documento al completar compra por pagos (idempotente si ya existe por confirmación)
+            if compra.estado == "COMPLETADA":
+                compra_doc = (
+                    Compra.objects.select_related("proveedor", "usuario")
+                    .prefetch_related("detalles__producto")
+                    .get(pk=compra.pk)
+                )
+                from apps.documentos.services import DocumentoService
+                from apps.documentos.exceptions import DocumentoError
+
+                try:
+                    DocumentoService.crear_documento_compra(compra_doc, usuario)
+                except DocumentoError as exc:
+                    raise CompraError(
+                        f"No se pudo generar el documento de la compra: {exc}"
+                    ) from exc
 
             return pago
 
@@ -535,6 +560,22 @@ class CompraService:
                 descripcion=f"Compra confirmada: {compra.numero_compra}",
                 request=None,  # No hay request en el contexto del servicio directo
             )
+
+            # Documento FACTURA_COMPRA (idempotente; misma transacción)
+            compra_full = (
+                Compra.objects.select_related("proveedor", "usuario")
+                .prefetch_related("detalles__producto")
+                .get(pk=compra.pk)
+            )
+            from apps.documentos.services import DocumentoService
+            from apps.documentos.exceptions import DocumentoError
+
+            try:
+                DocumentoService.crear_documento_compra(compra_full, usuario)
+            except DocumentoError as exc:
+                raise CompraError(
+                    f"No se pudo generar el documento de la compra: {exc}"
+                ) from exc
 
             return compra
 

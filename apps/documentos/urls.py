@@ -12,7 +12,8 @@ Endpoints disponibles:
     POST  /api/documentos/reportes/inventario/
 """
 
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from .views import (
     CompraDocumentoView,
     VentaFacturaView,
@@ -20,18 +21,25 @@ from .views import (
     ReporteVentasView,
     ReporteComprasView,
     ReporteInventarioView,
+    DocumentoViewSet,
 )
 
 app_name = "documentos"
 
+router = DefaultRouter()
+router.register(r'', DocumentoViewSet, basename='documento')
+
 urlpatterns = [
-    # ── Compras ───────────────────────────────────────────────────
+    # ── Módulo Centralizado (API REST) ────────────────────────────
+    path("", include(router.urls)),
+
+    # ── Compras (Legacy) ──────────────────────────────────────────
     path(
         "compra/<int:pk>/pdf/",
         CompraDocumentoView.as_view(),
         name="compra-pdf",
     ),
-    # ── Ventas ────────────────────────────────────────────────────
+    # ── Ventas (Legacy) ───────────────────────────────────────────
     path(
         "venta/<int:pk>/factura/",
         VentaFacturaView.as_view(),

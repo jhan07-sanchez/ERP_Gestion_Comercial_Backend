@@ -627,19 +627,27 @@ def construir_footer(empresa: dict, texto_extra: str = "") -> list:
     return footer_elements
 
 
-def formatear_fecha(fecha_str: str) -> str:
+def formatear_fecha(fecha_input, formato: str = "largo") -> str:
     """
     Formatea fecha ISO a formato legible en español.
 
     Args:
-        fecha_str: Fecha en formato "YYYY-MM-DD" o "YYYY-MM-DDTHH:MM:SS"
+        fecha_input: Fecha en formato string ISO, datetime, o date
+        formato: "largo" → "12 de abril de 2026"
+                 "corto" → "12/Abr/2026 5:14 PM"
+                 "fecha" → "12/04/2026"
 
     Returns:
-        str: Ej: "17 de febrero de 2026"
-    """
-    from datetime import datetime
+        str: Fecha formateada en español
 
-    meses = [
+    Ejemplo:
+        formatear_fecha("2026-04-12T21:58:23+00:00")          → "12 de abril de 2026"
+        formatear_fecha("2026-04-12T21:58:23+00:00", "corto") → "12/Abr/2026 9:58 PM"
+        formatear_fecha(venta.fecha)                           → "12 de abril de 2026"
+    """
+    from datetime import datetime, date
+
+    meses_largo = [
         "",
         "enero",
         "febrero",
@@ -655,15 +663,68 @@ def formatear_fecha(fecha_str: str) -> str:
         "diciembre",
     ]
 
-    try:
-        if "T" in fecha_str:
-            fecha = datetime.fromisoformat(fecha_str)
-        else:
-            fecha = datetime.strptime(fecha_str, "%Y-%m-%d")
+    meses_corto = [
+        "",
+        "Ene",
+        "Feb",
+        "Mar",
+        "Abr",
+        "May",
+        "Jun",
+        "Jul",
+        "Ago",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dic",
+    ]
 
-        return f"{fecha.day} de {meses[fecha.month]} de {fecha.year}"
+    try:
+        # Si ya es datetime o date, usarlo directamente
+        if isinstance(fecha_input, datetime):
+            fecha = fecha_input
+        elif isinstance(fecha_input, date):
+            fecha = datetime(fecha_input.year, fecha_input.month, fecha_input.day)
+        elif isinstance(fecha_input, str) and fecha_input:
+            # Limpiar string: quitar timezone info para parsing simple
+            fecha_str = str(fecha_input).strip()
+            if "T" in fecha_str:
+                # Quitar timezone offset (+00:00, -05:00, Z, etc.)
+                base = fecha_str.split("+")[0].split("Z")[0]
+                # Truncar microsegundos excesivos
+                if "." in base:
+                    partes = base.split(".")
+                    base = f"{partes[0]}.{partes[1][:6]}"
+                fecha = datetime.fromisoformat(base)
+            elif " " in fecha_str and ":" in fecha_str:
+                # Formato "2026-04-12 21:58:23.081726+00:00"
+                base = fecha_str.split("+")[0].split("Z")[0].strip()
+                if "." in base:
+                    partes = base.split(".")
+                    base = f"{partes[0]}.{partes[1][:6]}"
+                fecha = datetime.fromisoformat(base)
+            else:
+                fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d")
+        else:
+            return str(fecha_input) if fecha_input else ""
+
+        if formato == "corto":
+            hora = fecha.strftime("%-I:%M %p") if hasattr(fecha, 'hour') else ""
+            # Windows no soporta %-I, usar alternativa
+            try:
+                hora = fecha.strftime("%-I:%M %p")
+            except ValueError:
+                hora = fecha.strftime("%I:%M %p").lstrip("0")
+            return f"{fecha.day}/{meses_corto[fecha.month]}/{fecha.year} {hora}".strip()
+
+        elif formato == "fecha":
+            return f"{fecha.day:02d}/{fecha.month:02d}/{fecha.year}"
+
+        else:  # "largo"
+            return f"{fecha.day} de {meses_largo[fecha.month]} de {fecha.year}"
+
     except Exception:
-        return fecha_str
+        return str(fecha_input) if fecha_input else ""
 
 
 def numero_a_letras(numero: float) -> str:

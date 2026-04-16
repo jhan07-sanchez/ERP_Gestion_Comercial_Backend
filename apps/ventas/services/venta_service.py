@@ -228,6 +228,18 @@ class VentaService:
             venta.estado = 'PARCIAL'
             
         venta.save()
+
+        # Documento ERP (factura / ticket): misma transacción; fallo → rollback total
+        if venta.estado == 'COMPLETADA':
+            from apps.documentos.services import DocumentoService
+            from apps.documentos.exceptions import DocumentoError
+
+            try:
+                DocumentoService.crear_documento_venta(venta, usuario)
+            except DocumentoError as exc:
+                raise ValueError(
+                    f"No se pudo generar el documento de la venta: {exc}"
+                ) from exc
         
         return pago
     
@@ -281,6 +293,16 @@ class VentaService:
         # Cambiar estado
         venta.estado = 'COMPLETADA'
         venta.save()
+
+        from apps.documentos.services import DocumentoService
+        from apps.documentos.exceptions import DocumentoError
+
+        try:
+            DocumentoService.crear_documento_venta(venta, usuario)
+        except DocumentoError as exc:
+            raise ValueError(
+                f"No se pudo generar el documento de la venta: {exc}"
+            ) from exc
         
         return venta
     

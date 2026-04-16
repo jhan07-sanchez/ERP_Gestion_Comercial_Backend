@@ -87,7 +87,7 @@ def generar_reporte_ventas(
         empresa=empresa,
         doc_titulo="REPORTE DE VENTAS",
         doc_numero=f"RV-{datetime.now().strftime('%Y%m%d%H%M')}",
-        doc_fecha=f"{formatear_fecha(fecha_inicio)} al {formatear_fecha(fecha_fin)}",
+        doc_fecha=f"{formatear_fecha(fecha_inicio, 'fecha')} al {formatear_fecha(fecha_fin, 'fecha')}",
     )
     elements.append(header)
     elements.append(
@@ -151,6 +151,7 @@ def generar_reporte_ventas(
     elements.append(Spacer(1, 14))
 
     # ── Tabla detallada de ventas ─────────────────────────────────────────
+    # ... (skipping some logic to keep replacement focused) ...
     elements.append(Paragraph("DETALLE DE VENTAS", estilos["etiqueta"]))
     elements.append(Spacer(1, 4))
 
@@ -160,7 +161,7 @@ def generar_reporte_ventas(
         data_tabla.append(
             [
                 getattr(v, "numero_venta", f"VT-{v.id:05d}"),
-                str(v.fecha)[:10],
+                formatear_fecha(v.fecha, "fecha"),
                 getattr(v.cliente, "nombre", str(v.cliente))[:25],
                 v.estado,
                 f"${float(v.total):,.2f}",
@@ -207,14 +208,16 @@ def generar_reporte_ventas(
     elements.append(tabla_ventas)
     elements.append(Spacer(1, 10))
 
-    # QR del reporte
-    qr_data = (
-        f"REPORTE_VENTAS|"
-        f"EMPRESA:{empresa.get('nit', '')}|"
-        f"DESDE:{fecha_inicio}|"
-        f"HASTA:{fecha_fin}|"
-        f"TOTAL:{total_ventas:.2f}"
-    )
+    # QR del reporte (JSON para profesionalismo)
+    import json
+    qr_payload = {
+        "rep": "VENTAS",
+        "nit": empresa.get("nit", ""),
+        "ini": str(fecha_inicio),
+        "fin": str(fecha_fin),
+        "tot": total_ventas
+    }
+    qr_data = json.dumps(qr_payload)
     qr_buffer = generar_qr(qr_data)
     qr_img = Image(qr_buffer, width=1 * inch, height=1 * inch)
     qr_table = Table([[qr_img]], colWidths=["100%"])
@@ -263,7 +266,7 @@ def generar_reporte_compras(
         empresa=empresa,
         doc_titulo="REPORTE DE COMPRAS",
         doc_numero=f"RC-{datetime.now().strftime('%Y%m%d%H%M')}",
-        doc_fecha=f"{formatear_fecha(fecha_inicio)} al {formatear_fecha(fecha_fin)}",
+        doc_fecha=f"{formatear_fecha(fecha_inicio, 'fecha')} al {formatear_fecha(fecha_fin, 'fecha')}",
     )
     elements.append(header)
     elements.append(
@@ -328,7 +331,7 @@ def generar_reporte_compras(
         data_tabla.append(
             [
                 co.numero_compra,
-                str(co.fecha)[:10],
+                formatear_fecha(co.fecha, "fecha"),
                 co.proveedor.nombre[:25],
                 co.estado,
                 f"${float(co.total):,.2f}",
@@ -361,6 +364,22 @@ def generar_reporte_compras(
 
     elements.append(tabla)
     elements.append(Spacer(1, 10))
+
+    # QR del reporte
+    import json
+    qr_payload = {
+        "rep": "COMPRAS",
+        "nit": empresa.get("nit", ""),
+        "ini": str(fecha_inicio),
+        "fin": str(fecha_fin),
+        "tot": total_compras
+    }
+    qr_data = json.dumps(qr_payload)
+    qr_buffer = generar_qr(qr_data)
+    qr_img = Image(qr_buffer, width=1 * inch, height=1 * inch)
+    qr_table = Table([[qr_img]], colWidths=["100%"])
+    qr_table.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "RIGHT")]))
+    elements.append(qr_table)
 
     for el in construir_footer(
         empresa, "Reporte generado por el sistema ERP. Uso interno."
@@ -405,7 +424,7 @@ def generar_reporte_inventario(productos_qs, empresa: dict) -> BytesIO:
         empresa=empresa,
         doc_titulo="REPORTE DE INVENTARIO",
         doc_numero=f"RI-{datetime.now().strftime('%Y%m%d')}",
-        doc_fecha=formatear_fecha(datetime.now().strftime("%Y-%m-%d")),
+        doc_fecha=formatear_fecha(datetime.now(), "largo"),
     )
     elements.append(header)
     elements.append(
@@ -525,6 +544,21 @@ def generar_reporte_inventario(productos_qs, empresa: dict) -> BytesIO:
 
     elements.append(tabla_inv)
     elements.append(Spacer(1, 10))
+
+    # QR del inventario (JSON)
+    import json
+    qr_payload = {
+        "rep": "INVENTARIO",
+        "nit": empresa.get("nit", ""),
+        "fec": datetime.now().strftime("%Y-%m-%d"),
+        "val": valor_inventario
+    }
+    qr_data = json.dumps(qr_payload)
+    qr_buffer = generar_qr(qr_data)
+    qr_img = Image(qr_buffer, width=1 * inch, height=1 * inch)
+    qr_table = Table([[qr_img]], colWidths=["100%"])
+    qr_table.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "RIGHT")]))
+    elements.append(qr_table)
 
     for el in construir_footer(
         empresa, "Reporte de inventario generado por el sistema ERP."
