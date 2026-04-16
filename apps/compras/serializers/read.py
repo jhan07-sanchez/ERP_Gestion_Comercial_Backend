@@ -405,7 +405,7 @@ class CompraDetailSerializer(serializers.ModelSerializer):
         return obj.estado not in ["COMPLETADA", "ANULADA"]
 
     def get_documento(self, obj):
-        from apps.documentos.serializers_resumen import resumen_documento_compra
+        from apps.documentos.serializers import resumen_documento_compra
 
         return resumen_documento_compra(obj.id)
 

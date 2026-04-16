@@ -322,7 +322,7 @@ class VentaDetailSerializer(serializers.ModelSerializer):
         return total or 0
 
     def get_documento(self, obj):
-        from apps.documentos.serializers_resumen import resumen_documento_venta
+        from apps.documentos.serializers import resumen_documento_venta
 
         return resumen_documento_venta(obj.id)
 
