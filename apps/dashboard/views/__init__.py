@@ -11,6 +11,7 @@ from .api import (
     ClientesTopView,
     AlertasView,
     ActividadRecienteView,
+    GraficoCajaView,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "ClientesTopView",
     "AlertasView",
     "ActividadRecienteView",
+    "GraficoCajaView",
 ]

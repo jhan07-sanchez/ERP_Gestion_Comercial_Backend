@@ -455,3 +455,30 @@ class ActividadRecienteView(APIView):
                 "Error al obtener la actividad reciente.",
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+# ============================================================================
+# ENDPOINT 12: GRÁFICO DE CAJA (FLUJO DEL DÍA)
+# ============================================================================
+
+
+class GraficoCajaView(APIView):
+    """
+    Datos para el gráfico de flujo de caja del día (comparativa ingresos vs egresos).
+
+    GET /api/dashboard/graficos/caja/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        periodo = request.query_params.get("periodo", "dia")
+        try:
+            data = DashboardService.obtener_grafico_caja(periodo=periodo)
+            return ok_response(data)
+        except Exception as e:
+            logger.error(f"Error en GraficoCajaView: {str(e)}")
+            return error_response(
+                "Error al obtener datos del gráfico de caja.",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

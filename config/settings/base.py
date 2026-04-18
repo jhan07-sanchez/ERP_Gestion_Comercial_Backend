@@ -89,6 +89,8 @@ MIDDLEWARE = [
     "apps.auditorias.middleware.AuditoriaMiddleware",
     # --- MIDDLEWARE DE CIERRE AUTOMÁTICO DE SESIÓN ---
     "apps.core.middleware.session_timeout.SessionTimeoutMiddleware",
+    # Middleware de Suscripción (Modo Limitado SaaS)
+    "apps.core.middleware.suscripcion_middleware.SuscripcionMiddleware",
 ]
 
 

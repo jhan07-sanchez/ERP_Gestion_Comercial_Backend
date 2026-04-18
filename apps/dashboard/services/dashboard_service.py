@@ -25,7 +25,7 @@ from django.db.models import (
     F,
     Q,
 )
-from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
+from django.db.models.functions import TruncDay, TruncMonth, TruncWeek, TruncHour
 from django.utils import timezone
 
 # Importamos los modelos de otras apps
@@ -556,6 +556,51 @@ class DashboardService:
             }
             for item in datos
         ]
+
+    @staticmethod
+    def obtener_grafico_caja(periodo="dia"):
+        """
+        Datos para el gráfico de flujo de caja del día o período.
+        Por ahora implementado para el DÍA agrupado por horas.
+        """
+        inicio_hoy, fin_hoy = _rango_hoy()
+
+        movimientos = MovimientoCaja.objects.filter(
+            fecha__range=(inicio_hoy, fin_hoy)
+        ).annotate(hora=TruncHour("fecha"))
+
+        datos_raw = (
+            movimientos.values("hora")
+            .annotate(
+                ingresos=Sum(
+                    "monto", filter=Q(tipo__in=MovimientoCaja.TIPOS_INGRESO)
+                ),
+                egresos=Sum(
+                    "monto", filter=Q(tipo__in=MovimientoCaja.TIPOS_EGRESO)
+                ),
+            )
+            .order_by("hora")
+        )
+
+        # Para que el gráfico se vea bien, generamos las horas del día (00:00 a 23:00)
+        # Esto evita "huecos" en la línea del gráfico si no hubo movimientos.
+        resultado = []
+        for h in range(24):
+            label = f"{h:02d}:00"
+            # Buscar si hay datos para esta hora
+            punto = next(
+                (d for d in datos_raw if d["hora"] and d["hora"].hour == h), None
+            )
+
+            resultado.append(
+                {
+                    "name": label,
+                    "ingresos": float(punto["ingresos"] or 0) if punto else 0,
+                    "egresos": float(punto["egresos"] or 0) if punto else 0,
+                }
+            )
+
+        return resultado
 
     # ========================================================================
     # TOP PRODUCTOS Y CLIENTES

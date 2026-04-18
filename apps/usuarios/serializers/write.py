@@ -1,7 +1,7 @@
 # apps/usuarios/serializers/write.py
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from apps.usuarios.models import Usuario, Rol, UsuarioRol
+from apps.usuarios.models import Usuario, Rol, UsuarioRol, SolicitudCuenta
 
 
 class RolWriteSerializer(serializers.ModelSerializer):
@@ -159,3 +159,9 @@ class ChangePasswordSerializer(serializers.Serializer):
 class UsuarioActivateSerializer(serializers.Serializer):
     """Serializer para activar/desactivar usuarios"""
     is_active = serializers.BooleanField(required=True)
+
+
+class SolicitudCuentaCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SolicitudCuenta
+        fields = ['nombre', 'empresa', 'email', 'telefono', 'plan']

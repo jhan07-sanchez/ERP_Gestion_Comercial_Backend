@@ -17,6 +17,19 @@ class Rol(models.Model):
         return self.nombre
 
 
+class Empresa(models.Model):
+    nombre = models.CharField(max_length=200)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'empresas'
+        verbose_name = 'Empresa'
+        verbose_name_plural = 'Empresas'
+
+    def __str__(self):
+        return self.nombre
+
+
 class UsuarioManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra_fields):
         if not email:
@@ -37,6 +50,7 @@ class UsuarioManager(BaseUserManager):
 class Usuario(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, null=True, blank=True, related_name='usuarios')
     token = models.CharField(max_length=255, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -77,3 +91,51 @@ class UsuarioRol(models.Model):
 
     def __str__(self):
         return f"{self.usuario.username} - {self.rol.nombre}"
+
+
+class SolicitudCuenta(models.Model):
+    ESTADOS = [
+        ('PENDIENTE', 'Pendiente'),
+        ('APROBADA', 'Aprobada'),
+        ('RECHAZADA', 'Rechazada'),
+    ]
+    nombre = models.CharField(max_length=150)
+    empresa = models.CharField(max_length=200)
+    email = models.EmailField()
+    telefono = models.CharField(max_length=50)
+    plan = models.CharField(max_length=50)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='PENDIENTE')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'solicitudes_cuenta'
+        verbose_name = 'Solicitud de Cuenta'
+        verbose_name_plural = 'Solicitudes de Cuenta'
+
+    def __str__(self):
+        return f"{self.empresa} - {self.email}"
+
+
+class Suscripcion(models.Model):
+    empresa = models.OneToOneField(Empresa, on_delete=models.CASCADE, related_name='suscripcion')
+    plan = models.CharField(max_length=50, default='PRO')
+    es_trial = models.BooleanField(default=True)
+    fecha_inicio = models.DateTimeField(default=timezone.now)
+    fecha_fin = models.DateTimeField()
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'suscripciones'
+        verbose_name = 'Suscripción'
+        verbose_name_plural = 'Suscripciones'
+
+    def __str__(self):
+        return f"{self.empresa.nombre} - {self.plan}"
+
+    def esta_activa(self):
+        if not self.activa:
+            return False
+        return self.fecha_fin >= timezone.now()
+
+    def dias_restantes(self):
+        return (self.fecha_fin - timezone.now()).days

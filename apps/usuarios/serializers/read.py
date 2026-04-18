@@ -1,6 +1,15 @@
 # apps/usuarios/serializers/read.py
 from rest_framework import serializers
-from apps.usuarios.models import Usuario, Rol, UsuarioRol
+from apps.usuarios.models import Usuario, Rol, UsuarioRol, Suscripcion
+
+
+class SuscripcionReadSerializer(serializers.ModelSerializer):
+    esta_activa = serializers.BooleanField(read_only=True)
+    dias_restantes = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Suscripcion
+        fields = ['plan', 'es_trial', 'fecha_inicio', 'fecha_fin', 'activa', 'esta_activa', 'dias_restantes']
 
 
 class RolReadSerializer(serializers.ModelSerializer):
@@ -86,6 +95,7 @@ class UsuarioMeSerializer(serializers.ModelSerializer):
     """Serializer para el usuario autenticado (perfil)"""
     roles = UsuarioRolReadSerializer(source='usuario_roles', many=True, read_only=True)
     permisos = serializers.SerializerMethodField()
+    suscripcion = SuscripcionReadSerializer(source='empresa.suscripcion', read_only=True)
     
     class Meta:
         model = Usuario
@@ -98,6 +108,7 @@ class UsuarioMeSerializer(serializers.ModelSerializer):
             'is_superuser',
             'roles',
             'permisos',
+            'suscripcion',
             'last_login',
             'fecha_creacion'
         ]

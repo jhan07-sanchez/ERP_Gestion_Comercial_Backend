@@ -8,21 +8,25 @@ from apps.auditorias.mixins import MixinAuditable
 from apps.auditorias.services.auditoria_service import AuditoriaService
 from apps.auditorias.utils import snapshot_objeto
 
-from apps.usuarios.models import Usuario, Rol
-from apps.usuarios.serializers import (
-    # Read
-    RolReadSerializer,
-    UsuarioListSerializer,
-    UsuarioDetailSerializer,
-    UsuarioMeSerializer,
+from apps.usuarios.serializers.write import (
     # Write
     RolWriteSerializer,
     UsuarioCreateSerializer,
     UsuarioUpdateSerializer,
     ChangePasswordSerializer,
-    UsuarioActivateSerializer
+    UsuarioActivateSerializer,
+    SolicitudCuentaCreateSerializer
 )
+from apps.usuarios.serializers.read import (
+    # Read
+    RolReadSerializer,
+    UsuarioListSerializer,
+    UsuarioDetailSerializer,
+    UsuarioMeSerializer
+)
+from apps.usuarios.models import Usuario, Rol, SolicitudCuenta
 from apps.usuarios.services import UsuarioService, RolService
+from apps.usuarios.services.saas_service import SaaSAccountService
 
 
 class RolViewSet(MixinAuditable, viewsets.ModelViewSet):
@@ -625,8 +629,54 @@ class UsuarioViewSet(MixinAuditable, viewsets.ModelViewSet):
                 {'error': 'Usuario no encontrado.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        except Exception as e:
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class SolicitudCuentaViewSet(viewsets.GenericViewSet):
+    """
+    ViewSet para manejar solicitudes de cuenta.
+    Público para permitir a cualquier persona registrarse.
+    """
+    permission_classes = [AllowAny]
+    serializer_class = SolicitudCuentaCreateSerializer
+
+    @action(detail=False, methods=['post'], url_path='solicitar-cuenta')
+    def solicitar_cuenta(self, request):
+        """
+        POST /api/auth/solicitar-cuenta/
+        """
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            solicitud = serializer.save()
+            return Response(
+                {
+                    "message": "Solicitud enviada correctamente. Un administrador la revisará pronto.",
+                    "solicitud_id": solicitud.id
+                },
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def aprobar(self, request, pk=None):
+        """
+        POST /api/auth/{id}/aprobar/
+        Permite a un administrador del sistema aprobar una solicitud.
+        """
+        if not request.user.is_staff:
+            return Response({"error": "No tienes permisos para aprobar solicitudes."}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            usuario, empresa = SaaSAccountService.aprobar_solicitud(pk)
+            return Response({
+                "message": f"Solicitud aprobada. Se creó la empresa {empresa.nombre} y el usuario {usuario.email}.",
+                "usuario_id": usuario.id,
+                "empresa_id": empresa.id
+            }, status=status.HTTP_200_OK)
+        except SolicitudCuenta.DoesNotExist:
+            return Response({"error": "Solicitud no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

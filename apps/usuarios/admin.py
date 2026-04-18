@@ -1,6 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import Usuario, Rol, UsuarioRol
+from .models import Usuario, Rol, UsuarioRol, Empresa, Suscripcion, SolicitudCuenta
+from .services.saas_service import SaaSAccountService
 
 
 @admin.register(Rol)
@@ -72,3 +73,48 @@ class UsuarioRolAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('usuario', 'rol')
+
+
+@admin.register(Empresa)
+class EmpresaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'fecha_creacion')
+    search_fields = ('nombre',)
+
+
+@admin.register(Suscripcion)
+class SuscripcionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'empresa', 'plan', 'fecha_inicio', 'fecha_fin', 'activa', 'es_trial')
+    list_filter = ('activa', 'es_trial', 'plan')
+    search_fields = ('empresa__nombre',)
+
+
+@admin.register(SolicitudCuenta)
+class SolicitudCuentaAdmin(admin.ModelAdmin):
+    list_display = ('id', 'empresa', 'nombre', 'email', 'plan', 'estado', 'fecha_creacion')
+    list_filter = ('estado', 'plan')
+    search_fields = ('empresa', 'email', 'nombre')
+    actions = ['aprobar_solicitudes']
+
+    @admin.action(description='Aprobar solicitudes seleccionadas')
+    def aprobar_solicitudes(self, request, queryset):
+        solicitudes = queryset.filter(estado='PENDIENTE')
+        contador = 0
+        errores = 0
+        
+        for solicitud in solicitudes:
+            try:
+                SaaSAccountService.aprobar_solicitud(solicitud.id)
+                contador += 1
+            except Exception as e:
+                self.message_user(request, f"Error en solicitud {solicitud.id}: {str(e)}", messages.ERROR)
+                errores += 1
+        
+        if contador > 0:
+            self.message_user(request, f"Se aprobaron {contador} solicitudes exitosamente.", messages.SUCCESS)
+        if errores > 0:
+            self.message_user(request, f"No se pudieron procesar {errores} solicitudes.", messages.WARNING)
+        
+        pendientes_restantes = queryset.exclude(estado='PENDIENTE').count()
+        if pendientes_restantes > 0:
+            self.message_user(request, f"{pendientes_restantes} solicitudes omitidas (no estaban pendientes).", messages.INFO)
+

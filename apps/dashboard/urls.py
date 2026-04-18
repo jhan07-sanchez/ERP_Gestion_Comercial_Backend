@@ -68,6 +68,7 @@ from apps.dashboard.views import (
     KpisClientesView,
     GraficoVentasView,
     GraficoComprasView,
+    GraficoCajaView,
     ProductosTopView,
     ClientesTopView,
     AlertasView,
@@ -87,6 +88,7 @@ urlpatterns = [
     # ── Gráficos ──────────────────────────────────────────────────────────────
     path("graficos/ventas/", GraficoVentasView.as_view(), name="grafico-ventas"),
     path("graficos/compras/", GraficoComprasView.as_view(), name="grafico-compras"),
+    path("graficos/caja/", GraficoCajaView.as_view(), name="grafico-caja"),
     # ── Top rankings ──────────────────────────────────────────────────────────
     path("top/productos/", ProductosTopView.as_view(), name="top-productos"),
     path("top/clientes/", ClientesTopView.as_view(), name="top-clientes"),
