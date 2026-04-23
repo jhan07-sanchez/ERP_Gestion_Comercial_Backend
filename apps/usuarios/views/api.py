@@ -15,7 +15,8 @@ from apps.usuarios.serializers.write import (
     UsuarioUpdateSerializer,
     ChangePasswordSerializer,
     UsuarioActivateSerializer,
-    SolicitudCuentaCreateSerializer
+    SolicitudCuentaCreateSerializer,
+    ActivarCuentaSerializer
 )
 from apps.usuarios.serializers.read import (
     # Read
@@ -680,3 +681,28 @@ class SolicitudCuentaViewSet(viewsets.GenericViewSet):
             return Response({"error": "Solicitud no encontrada."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='activar-cuenta')
+    def activar_cuenta(self, request):
+        """
+        POST /api/auth/activar-cuenta/
+        """
+        serializer = ActivarCuentaSerializer(data=request.data)
+        if serializer.is_valid():
+            try:
+                usuario = SaaSAccountService.activar_cuenta(
+                    token_uuid=serializer.validated_data['token'],
+                    new_password=serializer.validated_data['password']
+                )
+                return Response(
+                    {
+                        "message": "Cuenta activada exitosamente. Tu período de prueba ha iniciado.",
+                        "usuario": usuario.email
+                    },
+                    status=status.HTTP_200_OK
+                )
+            except ValueError as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

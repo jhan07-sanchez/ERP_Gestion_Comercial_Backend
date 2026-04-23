@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import Usuario, Rol, UsuarioRol, Empresa, Suscripcion, SolicitudCuenta
+from .models import Usuario, Rol, UsuarioRol, Empresa, Suscripcion, SolicitudCuenta, Modulo, Plan
 from .services.saas_service import SaaSAccountService
 
 
@@ -81,11 +81,39 @@ class EmpresaAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)
 
 
+@admin.register(Modulo)
+class ModuloAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'codigo', 'activo')
+    list_filter = ('activo',)
+    search_fields = ('nombre', 'codigo')
+    prepopulated_fields = {'codigo': ('nombre',)}
+
+
+@admin.register(Plan)
+class PlanAdmin(admin.ModelAdmin):
+    list_display = ('id', 'nombre', 'precio', 'activo', 'fecha_creacion')
+    list_filter = ('activo', 'fecha_creacion')
+    search_fields = ('nombre',)
+    filter_horizontal = ('modulos',)
+
+
 @admin.register(Suscripcion)
 class SuscripcionAdmin(admin.ModelAdmin):
-    list_display = ('id', 'empresa', 'plan', 'fecha_inicio', 'fecha_fin', 'activa', 'es_trial')
-    list_filter = ('activa', 'es_trial', 'plan')
-    search_fields = ('empresa__nombre',)
+    list_display = ('id', 'empresa', 'plan', 'estado_pago', 'fecha_inicio', 'fecha_fin', 'activa', 'es_trial')
+    list_filter = ('activa', 'es_trial', 'estado_pago', 'plan')
+    search_fields = ('empresa__nombre', 'stripe_customer_id', 'stripe_subscription_id')
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('empresa', 'plan', 'activa', 'es_trial')
+        }),
+        ('Fechas', {
+            'fields': ('fecha_inicio', 'fecha_fin')
+        }),
+        ('Stripe / Pagos', {
+            'fields': ('estado_pago', 'stripe_customer_id', 'stripe_subscription_id'),
+            'classes': ('collapse',),
+        }),
+    )
 
 
 @admin.register(SolicitudCuenta)

@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
+import uuid
+from datetime import timedelta
 
 class Rol(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
@@ -116,13 +118,56 @@ class SolicitudCuenta(models.Model):
         return f"{self.empresa} - {self.email}"
 
 
+class Modulo(models.Model):
+    nombre = models.CharField(max_length=100)
+    codigo = models.SlugField(max_length=100, unique=True)
+    descripcion = models.TextField(blank=True, null=True)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'modulos'
+        verbose_name = 'Módulo'
+        verbose_name_plural = 'Módulos'
+
+    def __str__(self):
+        return self.nombre
+
+
+class Plan(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    descripcion = models.TextField(blank=True, null=True)
+    precio = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    modulos = models.ManyToManyField(Modulo, related_name='planes', blank=True)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'planes'
+        verbose_name = 'Plan'
+        verbose_name_plural = 'Planes'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Suscripcion(models.Model):
+    ESTADOS_PAGO = [
+        ('activa', 'Activa'),
+        ('cancelada', 'Cancelada'),
+        ('en_gracia', 'En período de gracia'),
+    ]
+
     empresa = models.OneToOneField(Empresa, on_delete=models.CASCADE, related_name='suscripcion')
-    plan = models.CharField(max_length=50, default='PRO')
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name='suscripciones')
     es_trial = models.BooleanField(default=True)
-    fecha_inicio = models.DateTimeField(default=timezone.now)
-    fecha_fin = models.DateTimeField()
-    activa = models.BooleanField(default=True)
+    fecha_inicio = models.DateTimeField(null=True, blank=True)
+    fecha_fin = models.DateTimeField(null=True, blank=True)
+    activa = models.BooleanField(default=False)
+    
+    # Preparación para pagos
+    stripe_customer_id = models.CharField(max_length=100, blank=True, null=True)
+    stripe_subscription_id = models.CharField(max_length=100, blank=True, null=True)
+    estado_pago = models.CharField(max_length=20, choices=ESTADOS_PAGO, default='activa')
 
     class Meta:
         db_table = 'suscripciones'
@@ -130,12 +175,38 @@ class Suscripcion(models.Model):
         verbose_name_plural = 'Suscripciones'
 
     def __str__(self):
-        return f"{self.empresa.nombre} - {self.plan}"
+        return f"{self.empresa.nombre} - {self.plan.nombre}"
 
     def esta_activa(self):
         if not self.activa:
             return False
-        return self.fecha_fin >= timezone.now()
+        if self.fecha_fin:
+            return self.fecha_fin >= timezone.now()
+        return False
 
     def dias_restantes(self):
-        return (self.fecha_fin - timezone.now()).days
+        if self.fecha_fin:
+            return (self.fecha_fin - timezone.now()).days
+        return 0
+
+
+class TokenActivacion(models.Model):
+    usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, related_name='token_activacion')
+    token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    usado = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'tokens_activacion'
+        verbose_name = 'Token de Activación'
+        verbose_name_plural = 'Tokens de Activación'
+
+    def __str__(self):
+        return str(self.token)
+
+    def es_valido(self):
+        """El token es válido si no se ha usado y tiene menos de 24 horas."""
+        if self.usado:
+            return False
+        # Calcular si han pasado menos de 24 horas (86400 segundos)
+        return (timezone.now() - self.creado_en).total_seconds() < 86400

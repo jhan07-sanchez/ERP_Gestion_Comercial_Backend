@@ -164,4 +164,25 @@ class UsuarioActivateSerializer(serializers.Serializer):
 class SolicitudCuentaCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = SolicitudCuenta
-        fields = ['nombre', 'empresa', 'email', 'telefono', 'plan']
+        fields = ['nombre', 'empresa', 'email', 'telefono', 'plan']
+
+
+class ActivarCuentaSerializer(serializers.Serializer):
+    """Serializer para activar cuenta mediante token"""
+    token = serializers.UUIDField(required=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=True,
+        validators=[validate_password],
+        style={'input_type': 'password'}
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        required=True,
+        style={'input_type': 'password'}
+    )
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Las contraseñas no coinciden."})
+        return attrs
