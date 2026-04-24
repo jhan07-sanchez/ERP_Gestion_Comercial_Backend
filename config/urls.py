@@ -30,6 +30,7 @@ urlpatterns = [
     path("api/configuracion/", include("apps.configuracion.urls")),
     path("api/auditorias/", include("apps.auditorias.urls", )),
     path("api/caja/", include("apps.caja.urls")),
+    path("api/precios/", include("apps.precios.urls")),
 ]
 
 # Servir archivos media en desarrollo
