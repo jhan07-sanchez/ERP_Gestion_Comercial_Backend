@@ -27,6 +27,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 from reportlab.platypus import Image, Paragraph, Table, TableStyle, HRFlowable
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from apps.configuracion.services import ConfiguracionService
 
 
 # ============================================================================
@@ -353,15 +354,15 @@ def construir_header_empresa(
     Returns:
         Table: Componente listo para agregar a elements[]
     """
+    config = ConfiguracionService.obtener_configuracion()
     estilos = obtener_estilos()
 
     # ── Columna izquierda: empresa ────────────────────────────────────────
     col_empresa = []
 
-    # Logo (si viene del frontend)
-    logo_buffer = procesar_logo(empresa.get("logo_base64", ""))
-    if logo_buffer:
-        col_empresa.append(Image(logo_buffer, width=1.8 * inch, height=0.8 * inch))
+    #  LOGO DESDE BASE DE DATOS
+    if config.logo:
+        col_empresa.append(Image(config.logo.path, width=1.8 * inch, height=0.8 * inch))
 
     col_empresa.append(
         Paragraph(empresa.get("nombre", "EMPRESA"), estilos["empresa_nombre"])

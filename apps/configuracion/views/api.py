@@ -175,6 +175,8 @@ class ConfiguracionView(APIView):
         )
 
         if not serializer.is_valid():
+            print("Errores del serializer:")
+            print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         config_actualizada = ConfiguracionService.actualizar_configuracion(

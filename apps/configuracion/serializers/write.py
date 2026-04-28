@@ -158,17 +158,20 @@ class ConfiguracionUpdateSerializer(serializers.ModelSerializer):
         - Si permitir_descuentos=False, el descuento_maximo no importa.
         - Si permitir_descuentos=True, el descuento_maximo debe ser > 0.
         """
-        permitir = data.get("permitir_descuentos", True)
-        descuento = data.get("descuento_maximo", 0)
+        permitir = data.get("permitir_descuentos", None)
+        descuento = data.get("descuento_maximo", None)
 
-        if permitir and descuento == 0:
-            raise serializers.ValidationError(
-                {
-                    "descuento_maximo": (
-                        "Si se permiten descuentos, el descuento máximo debe ser mayor que 0%."
-                    )
-                }
-            )
+        # Solo validar si ambos vienen
+
+        if permitir is not None and descuento is not None:
+            if permitir and descuento == 0:
+                raise serializers.ValidationError(
+                    {
+                        "descuento_maximo": (
+                            "Si se permiten descuentos, el descuento máximo debe ser mayor que 0%."
+                        )
+                    }
+                )
 
         return data
 
