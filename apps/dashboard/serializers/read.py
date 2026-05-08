@@ -82,3 +82,19 @@ class FiltroTopSerializer(serializers.Serializer):
     )
     fecha_inicio = serializers.DateField(required=False, format="%Y-%m-%d")
     fecha_fin = serializers.DateField(required=False, format="%Y-%m-%d")
+
+
+class FiltroAnaliticaSerializer(FiltroFechasSerializer):
+    """
+    Parámetros avanzados para el reporte de analítica completa.
+    """
+
+    sucursal = serializers.IntegerField(required=False)
+    caja = serializers.IntegerField(required=False)
+    vendedor = serializers.IntegerField(required=False)
+    rango = serializers.ChoiceField(
+        choices=[("7d", "7 días"), ("30d", "30 días"), ("90d", "90 días"), ("ytd", "Año actual")],
+        default="30d",
+        required=False,
+    )
+

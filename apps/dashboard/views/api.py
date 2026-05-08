@@ -24,6 +24,7 @@ from apps.dashboard.serializers import (
     FiltroFechasSerializer,
     FiltroGraficoSerializer,
     FiltroTopSerializer,
+    FiltroAnaliticaSerializer,
 )
 
 logger = logging.getLogger("dashboard")
@@ -480,5 +481,38 @@ class GraficoCajaView(APIView):
             logger.error(f"Error en GraficoCajaView: {str(e)}")
             return error_response(
                 "Error al obtener datos del gráfico de caja.",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ============================================================================
+# ENDPOINT 13: ANALÍTICA COMPLETA (MODULO REPORTES)
+# ============================================================================
+
+
+class AnaliticaCompletaView(APIView):
+    """
+    Endpoint maestro para el módulo de analítica/reportes.
+    Calcula KPIs financieros, comerciales, operativos y datos de gráficas.
+    
+    GET /api/dashboard/analytics/
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = FiltroAnaliticaSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return error_response(serializer.errors)
+
+        try:
+            data = DashboardService.obtener_analitica_completa(
+                filtros=serializer.validated_data
+            )
+            return ok_response(data)
+        except Exception as e:
+            logger.error(f"Error en AnaliticaCompletaView: {str(e)}")
+            return error_response(
+                f"Error al calcular analítica: {str(e)}",
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
