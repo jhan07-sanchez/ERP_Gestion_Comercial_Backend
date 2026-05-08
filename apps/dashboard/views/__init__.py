@@ -13,6 +13,8 @@ from .api import (
     ActividadRecienteView,
     GraficoCajaView,
     AnaliticaCompletaView,
+    EstadoResultadosView,
+    BalanceGeneralView,
 )
 
 __all__ = [
@@ -29,4 +31,6 @@ __all__ = [
     "ActividadRecienteView",
     "GraficoCajaView",
     "AnaliticaCompletaView",
+    "EstadoResultadosView",
+    "BalanceGeneralView",
 ]

@@ -1198,3 +1198,78 @@ class DashboardService:
                 "lowRotationProducts": []
             }
         }
+
+    @staticmethod
+    def obtener_estado_resultados(filtros=None):
+        """
+        Retorna los movimientos financieros para el Estado de Resultados.
+        """
+        filtros = filtros or {}
+        movimientos = MovimientoCaja.objects.select_related("sesion", "usuario").all()
+
+        if filtros.get("tipo"):
+            # Mapeo frontend -> backend
+            tipo_map = {"ingreso": "INGRESO", "egreso": "EGRESO"}
+            prefix = tipo_map.get(filtros["tipo"], "INGRESO")
+            movimientos = movimientos.filter(tipo__startswith=prefix)
+
+        if filtros.get("fechaDesde"):
+            movimientos = movimientos.filter(fecha__date__gte=filtros["fechaDesde"])
+        if filtros.get("fechaHasta"):
+            movimientos = movimientos.filter(fecha__date__lte=filtros["fechaHasta"])
+
+        data = []
+        for m in movimientos:
+            # Clasificación simple por categoría basada en el tipo de movimiento
+            cat = "OTROS"
+            if m.tipo == "INGRESO_VENTA": cat = "VENTA"
+            elif m.tipo == "EGRESO_COMPRA": cat = "COSTO_VENTA"
+            elif m.tipo == "EGRESO_GASTO": cat = "GASTO_ADMIN"
+            
+            data.append({
+                "id": str(m.id),
+                "fecha": m.fecha.date().isoformat(),
+                "concepto": m.descripcion or m.get_tipo_display(),
+                "tipo": "ingreso" if m.tipo.startswith("INGRESO") or m.tipo == "APERTURA" else "egreso",
+                "monto": float(m.monto),
+                "categoria": cat
+            })
+        return data
+
+    @staticmethod
+    def obtener_balance_general():
+        """
+        Cálculo dinámico del Balance General.
+        """
+        # 1. ACTIVOS
+        # Dinero en cajas (Saldo actual total de todas las cajas)
+        efectivo_caja = Caja.objects.aggregate(s=Sum("saldo_actual"))["s"] or 0
+        # Valor del inventario
+        valor_inventario = Inventario.objects.aggregate(
+            v=Sum(F("stock_actual") * F("producto__precio_compra"))
+        )["v"] or 0
+        
+        activos_corrientes = float(efectivo_caja) + float(valor_inventario)
+        activos_no_corrientes = 0 # Implementación futura (Propiedades, Equipos)
+        
+        # 2. PASIVOS
+        # Por ahora simplificado, se podría integrar con cuentas por pagar
+        pasivos_corrientes = 0
+        pasivos_no_corrientes = 0
+        
+        # 3. PATRIMONIO
+        total_activos = activos_corrientes + activos_no_corrientes
+        total_pasivos = pasivos_corrientes + pasivos_no_corrientes
+        patrimonio = total_activos - total_pasivos
+        
+        return {
+            "activos": {
+                "corrientes": activos_corrientes,
+                "noCorrientes": activos_no_corrientes
+            },
+            "pasivos": {
+                "corrientes": pasivos_corrientes,
+                "noCorrientes": pasivos_no_corrientes
+            },
+            "patrimonio": patrimonio
+        }

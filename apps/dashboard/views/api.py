@@ -511,8 +511,57 @@ class AnaliticaCompletaView(APIView):
             )
             return ok_response(data)
         except Exception as e:
-            logger.error(f"Error en AnaliticaCompletaView: {str(e)}")
             return error_response(
                 f"Error al calcular analítica: {str(e)}",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ============================================================================
+# ENDPOINT 14: ESTADO DE RESULTADOS
+# ============================================================================
+
+
+class EstadoResultadosView(APIView):
+    """
+    Lista de movimientos financieros para el reporte de pérdidas y ganancias.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            data = DashboardService.obtener_estado_resultados(
+                filtros=request.query_params
+            )
+            return ok_response(data)
+        except Exception as e:
+            logger.error(f"Error en EstadoResultadosView: {str(e)}")
+            return error_response(
+                "Error al obtener el estado de resultados.",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ============================================================================
+# ENDPOINT 15: BALANCE GENERAL
+# ============================================================================
+
+
+class BalanceGeneralView(APIView):
+    """
+    Situación financiera actual (Activos, Pasivos, Patrimonio).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            data = DashboardService.obtener_balance_general()
+            return ok_response(data)
+        except Exception as e:
+            logger.error(f"Error en BalanceGeneralView: {str(e)}")
+            return error_response(
+                "Error al obtener el balance general.",
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

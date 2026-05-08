@@ -74,6 +74,8 @@ from apps.dashboard.views import (
     AlertasView,
     ActividadRecienteView,
     AnaliticaCompletaView,
+    EstadoResultadosView,
+    BalanceGeneralView,
 )
 
 app_name = "dashboard"
@@ -81,6 +83,11 @@ app_name = "dashboard"
 urlpatterns = [
     # ── Analítica Avanzada ───────────────────────────────────────────────────
     path("analytics/", AnaliticaCompletaView.as_view(), name="analytics-completa"),
+    
+    # ── Reportes Financieros ──────────────────────────────────────────────────
+    path("reportes/estado-resultados/", EstadoResultadosView.as_view(), name="reporte-estado-resultados"),
+    path("reportes/balance-general/", BalanceGeneralView.as_view(), name="reporte-balance-general"),
+
     # ── Resumen general ───────────────────────────────────────────────────────
     path("resumen/", ResumenGeneralView.as_view(), name="resumen-general"),
     # ── KPIs por módulo ───────────────────────────────────────────────────────
