@@ -69,6 +69,8 @@ LOCAL_APPS = [
     "apps.configuracion.apps.ConfiguracionConfig",
     # Dashboard KPIs
     "apps.dashboard.apps.DashboardConfig",
+    # Reportes y Analítica Avanzada
+    "apps.reportes.apps.ReportesConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
