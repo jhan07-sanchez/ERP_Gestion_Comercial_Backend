@@ -116,8 +116,21 @@ class ListaPrecioCompraService:
         Raises:
             PrecioValidationError: Si los datos no son válidos
         """
-        ahora = timezone.now()
+        import datetime
+        from django.utils.timezone import is_aware, make_aware
+
+        ahora = timezone.localtime()
         fecha_inicio = fecha_inicio or ahora
+
+        if isinstance(fecha_inicio, datetime.datetime):
+            if fecha_inicio.time() == datetime.time.min:
+                fecha_inicio = datetime.datetime.combine(fecha_inicio.date(), ahora.time())
+        elif isinstance(fecha_inicio, datetime.date):
+            fecha_inicio = datetime.datetime.combine(fecha_inicio, ahora.time())
+
+        if isinstance(fecha_inicio, datetime.datetime) and not is_aware(fecha_inicio):
+            fecha_inicio = make_aware(fecha_inicio)
+
 
         logger.info(
             f"🏷️ Creando precio para producto={producto.nombre} "
@@ -182,6 +195,16 @@ class ListaPrecioCompraService:
         if precio is not None:
             instancia.precio = precio
         if fecha_inicio is not None:
+            import datetime
+            from django.utils.timezone import is_aware, make_aware
+            if isinstance(fecha_inicio, datetime.datetime):
+                if fecha_inicio.time() == datetime.time.min:
+                    fecha_inicio = datetime.datetime.combine(fecha_inicio.date(), timezone.localtime().time())
+            elif isinstance(fecha_inicio, datetime.date):
+                fecha_inicio = datetime.datetime.combine(fecha_inicio, timezone.localtime().time())
+
+            if isinstance(fecha_inicio, datetime.datetime) and not is_aware(fecha_inicio):
+                fecha_inicio = make_aware(fecha_inicio)
             instancia.fecha_inicio = fecha_inicio
         if fecha_fin is not None:
             instancia.fecha_fin = fecha_fin

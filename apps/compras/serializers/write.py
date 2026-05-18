@@ -46,6 +46,10 @@ class DetalleCompraWriteSerializer(serializers.Serializer):
         required=False,  # Se toma del producto si no se proporciona
         min_value=Decimal("0.01"),
     )
+    guardar_en_lista_precio = serializers.BooleanField(
+        default=False,
+        help_text="Si es True, actualiza o crea el precio en la lista de precios del proveedor"
+    )
 
     def validate_producto_id(self, value):
         """Validar que el producto existe"""
@@ -398,6 +402,22 @@ class CompraUpdateSerializer(serializers.ModelSerializer):
                     precio_compra=precio,
                     # subtotal se calcula automáticamente en el modelo
                 )
+
+                if detalle_data.get("guardar_en_lista_precio"):
+                    from apps.precios.services.precio_service import ListaPrecioCompraService
+                    import logging
+                    logger = logging.getLogger("compras")
+                    try:
+                        ListaPrecioCompraService.crear_precio(
+                            producto=producto,
+                            proveedor=instance.proveedor,
+                            precio=precio,
+                            fecha_inicio=instance.fecha,
+                        )
+                        logger.info(f"✅ Precio actualizado en lista para {producto.nombre}")
+                    except Exception as e:
+                        logger.exception("❌ Error al guardar en lista de precios")
+                        pass
 
         instance.save()
         return instance

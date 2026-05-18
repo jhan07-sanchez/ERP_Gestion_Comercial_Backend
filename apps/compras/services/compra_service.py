@@ -150,6 +150,7 @@ class CompraService:
                 producto_id = detalle["producto_id"]
                 cantidad = Decimal(str(detalle["cantidad"]))
                 precio = detalle.get("precio_compra")
+                guardar_en_lista_precio = detalle.get("guardar_en_lista_precio", False)
 
                 # Obtener producto
                 try:
@@ -180,6 +181,7 @@ class CompraService:
                         "cantidad": cantidad,
                         "precio_compra": precio,
                         "subtotal": subtotal,
+                        "guardar_en_lista_precio": guardar_en_lista_precio,
                     }
                 )
 
@@ -202,7 +204,9 @@ class CompraService:
                 request=request,
             )
 
-            # 5. Crear los detalles
+            # 5. Crear los detalles y actualizar precios
+            from apps.precios.services.precio_service import ListaPrecioCompraService
+            
             for item in productos_validados:
                 DetalleCompra.objects.create(
                     compra=compra,
@@ -210,6 +214,22 @@ class CompraService:
                     cantidad=item["cantidad"],
                     precio_compra=item["precio_compra"],
                 )
+                
+                # Actualizar lista de precios del proveedor si se solicitó
+                if item["guardar_en_lista_precio"]:
+                    try:
+                        ListaPrecioCompraService.crear_precio(
+                            producto=item["producto"],
+                            proveedor=proveedor,
+                            precio=item["precio_compra"],
+                            fecha_inicio=fecha,
+                            usuario=usuario
+                        )
+                        logger.info(f"✅ Precio actualizado en lista para {item['producto'].nombre} y proveedor {proveedor.nombre}")
+                    except Exception as e:
+                        logger.exception("❌ Error al guardar en lista de precios")
+                        # No lanzamos excepción para no bloquear la compra, pero se registra
+                        pass
 
             logger.info(
                 f"✅ Compra {compra.numero_compra} creada exitosamente. "
