@@ -19,7 +19,7 @@ class DetalleVentaInline(admin.TabularInline):
 class VentaAdmin(admin.ModelAdmin):
     list_display = ('id', 'cliente', 'total_formateado', 'estado_badge', 'usuario', 'fecha')
     list_filter = ('estado', 'fecha')
-    search_fields = ('cliente__nombre', 'cliente__documento')
+    search_fields = ("cliente__nombre", "cliente__numero_documento")
     readonly_fields = ('fecha',)
     date_hierarchy = 'fecha'
     inlines = [DetalleVentaInline]

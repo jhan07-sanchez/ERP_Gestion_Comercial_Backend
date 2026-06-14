@@ -158,7 +158,7 @@ class VentaViewSet(MixinAuditable, viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(
                 Q(cliente__nombre__icontains=search) |
-                Q(cliente__documento__icontains=search) |
+                Q(cliente__numero_documento__icontains=search) |
                 Q(id__icontains=search)
             )
 
