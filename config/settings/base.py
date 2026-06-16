@@ -65,6 +65,7 @@ LOCAL_APPS = [
     "apps.ventas.apps.VentasConfig",
     "apps.compras.apps.ComprasConfig",
     "apps.caja.apps.CajaConfig",
+    "apps.facturacion.apps.FacturacionConfig",
     # Configuración
     "apps.configuracion.apps.ConfiguracionConfig",
     # Dashboard KPIs
