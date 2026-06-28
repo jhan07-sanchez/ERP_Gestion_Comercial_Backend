@@ -53,9 +53,10 @@ def generar_pdf_factura(documento, empresa: dict) -> BytesIO:
     estilos = obtener_estilos()
 
     # 1. Obtener datos de origen
-    venta = documento.venta
+    # Puede venir de Venta (ventas) o de Factura (facturacion)
+    venta = getattr(documento, 'venta', None) or getattr(documento, 'factura_origen', None)
     if not venta:
-        raise ValueError("El documento no está asociado a una venta.")
+        raise ValueError("El documento no está asociado a una venta o factura.")
 
     numero_factura = documento.numero_interno
     fecha_doc = documento.fecha_emision
@@ -102,13 +103,19 @@ def generar_pdf_factura(documento, empresa: dict) -> BytesIO:
     cliente = venta.cliente
     nombre_cliente = getattr(cliente, "nombre", str(cliente))
     
+    metodo_pago_display = "CONTADO"
+    if hasattr(venta, 'condicion_pago') and venta.condicion_pago:
+        metodo_pago_display = venta.condicion_pago.nombre
+    elif hasattr(venta, 'metodo_pago') and venta.metodo_pago:
+        metodo_pago_display = str(venta.metodo_pago)
+        
     info_data = [
         [
             # Columna Cliente
             [
                 Paragraph("CLIENTE / COMPRADOR", estilos["etiqueta"]),
                 Paragraph(nombre_cliente, estilos["valor_bold"]),
-                Paragraph(f"NIT/CC: {getattr(cliente, 'documento', '-')}", estilos["valor"]),
+                Paragraph(f"NIT/CC: {getattr(cliente, 'numero_documento', getattr(cliente, 'documento', '-'))}", estilos["valor"]),
                 Paragraph(f"Dirección: {getattr(cliente, 'direccion', '-')}", estilos["valor"]),
                 Paragraph(f"Teléfono: {getattr(cliente, 'telefono', '-')}", estilos["valor"]),
                 Paragraph(f"Email: {getattr(cliente, 'email', '-')}", estilos["valor"]),
@@ -116,7 +123,7 @@ def generar_pdf_factura(documento, empresa: dict) -> BytesIO:
             # Columna Condiciones
             [
                 Paragraph("CONDICIONES DE VENTA", estilos["etiqueta"]),
-                Paragraph(f"Método de pago: {getattr(venta, 'metodo_pago', 'CONTADO')}", estilos["valor"]),
+                Paragraph(f"Condición de pago: {metodo_pago_display}", estilos["valor"]),
                 Spacer(1, 4),
                 Paragraph("VENDEDOR", estilos["etiqueta"]),
                 Paragraph(str(documento.usuario) if documento.usuario else "-", estilos["valor"]),

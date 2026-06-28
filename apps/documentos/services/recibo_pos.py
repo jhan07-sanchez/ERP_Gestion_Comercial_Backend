@@ -80,9 +80,9 @@ def generar_recibo_pos(documento, empresa: dict) -> BytesIO:
     estilos = obtener_estilos()
 
     # 1. Obtener datos de origen
-    venta = documento.venta
+    venta = getattr(documento, 'venta', None) or getattr(documento, 'factura_origen', None)
     if not venta:
-        raise ValueError("El documento no está asociado a una venta.")
+        raise ValueError("El documento no está asociado a una venta o factura.")
 
     # 2. Preparar datos
     # Usamos las líneas persistentes (snapshot)
@@ -221,7 +221,11 @@ def generar_recibo_pos(documento, empresa: dict) -> BytesIO:
     elements.append(Spacer(1, 2 * mm))
 
     # Forma de pago
-    metodo = getattr(venta, "metodo_pago", "EFECTIVO")
+    metodo = "EFECTIVO"
+    if hasattr(venta, 'condicion_pago') and venta.condicion_pago:
+        metodo = venta.condicion_pago.nombre
+    elif hasattr(venta, 'metodo_pago') and venta.metodo_pago:
+        metodo = str(venta.metodo_pago)
     elements.append(Paragraph(f"FORMA DE PAGO: {metodo}", estilos["pos_bold"]))
     
     # Manejo de Efectivo/Cambio
