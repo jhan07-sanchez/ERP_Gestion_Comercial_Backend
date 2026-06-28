@@ -125,7 +125,7 @@ class CompraViewSet(MixinAuditable, viewsets.ModelViewSet):
     """
 
     queryset = Compra.objects.select_related("proveedor", "usuario").prefetch_related(
-        "detalles__producto"
+        "detalles__producto", "pagos"
     )
 
     pagination_class = CompraPagination

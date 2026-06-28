@@ -218,8 +218,7 @@ class CompraListSerializer(serializers.ModelSerializer):
 
     def get_total_unidades(self, obj):
         """Total de unidades compradas"""
-        total = obj.detalles.aggregate(total=Sum("cantidad"))["total"]
-        return total or 0
+        return sum(d.cantidad for d in obj.detalles.all())
 
     def get_estado_badge(self, obj):
         """
@@ -236,18 +235,20 @@ class CompraListSerializer(serializers.ModelSerializer):
         return badges.get(obj.estado, badges["PENDIENTE"])
 
     def get_productos_resumen(self, obj):
-        detalles = obj.detalles.select_related("producto").all()
-        return ", ".join([d.producto.nombre for d in detalles])
+        return ", ".join([d.producto.nombre for d in obj.detalles.all()])
 
     def get_saldo_pendiente(self, obj):
         """
         Calcular cuánto falta por pagar de contado.
         Los pagos de tipo 'CRÉDITO' no reducen el saldo pendiente de la compra.
         """
+        # Obtenemos los métodos de pago en memoria, o idealmente desde un enum si lo hubiera.
+        # Si no queremos hacer queries, iteramos los pagos. Asumiendo que el tipo_pago está prefetched.
+        # En este caso, simplemente sumamos los pagos cuyo 'metodo_pago' no sea de crédito.
         from apps.caja.models import MetodoPago
-        metodos_contado = MetodoPago.objects.filter(tipo=MetodoPago.TIPO_CONTADO).values_list('nombre', flat=True)
+        metodos_contado = set(MetodoPago.objects.filter(tipo=MetodoPago.TIPO_CONTADO).values_list('nombre', flat=True))
         
-        pagado_contado = obj.pagos.filter(metodo_pago__in=metodos_contado).aggregate(total=Sum("monto"))["total"] or 0
+        pagado_contado = sum(p.monto for p in obj.pagos.all() if p.metodo_pago in metodos_contado)
         return float(obj.total - pagado_contado)
 
 class CompraDetailSerializer(serializers.ModelSerializer):
@@ -333,8 +334,7 @@ class CompraDetailSerializer(serializers.ModelSerializer):
 
     def get_total_unidades(self, obj):
         """Total de unidades compradas"""
-        total = obj.detalles.aggregate(total=Sum("cantidad"))["total"]
-        return total or 0
+        return sum(d.cantidad for d in obj.detalles.all())
 
     def get_total_pagado(self, obj):
         """
@@ -342,10 +342,9 @@ class CompraDetailSerializer(serializers.ModelSerializer):
         Se excluyen pagos de tipo CRÉDITO porque representan deuda asumida.
         """
         from apps.caja.models import MetodoPago
-        metodos_contado = MetodoPago.objects.filter(tipo=MetodoPago.TIPO_CONTADO).values_list('nombre', flat=True)
+        metodos_contado = set(MetodoPago.objects.filter(tipo=MetodoPago.TIPO_CONTADO).values_list('nombre', flat=True))
         
-        total = obj.pagos.filter(metodo_pago__in=metodos_contado).aggregate(total=Sum("monto"))["total"]
-        return float(total or 0)
+        return sum(p.monto for p in obj.pagos.all() if p.metodo_pago in metodos_contado)
 
     def get_saldo_pendiente(self, obj):
         """Total - Pagado (Contado)"""
@@ -405,9 +404,12 @@ class CompraDetailSerializer(serializers.ModelSerializer):
         return obj.estado not in ["COMPLETADA", "ANULADA"]
 
     def get_documento(self, obj):
-        from apps.documentos.serializers import resumen_documento_compra
+        try:
+            from apps.documentos.serializers import resumen_documento_compra
 
-        return resumen_documento_compra(obj.id)
+            return resumen_documento_compra(obj.id)
+        except Exception:
+            return None
 
 
 class CompraSimpleSerializer(serializers.ModelSerializer):
