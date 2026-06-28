@@ -73,6 +73,19 @@ class ConfiguracionUpdateSerializer(serializers.ModelSerializer):
             "descuento_maximo",
             "permitir_venta_sin_stock",
             "terminos_condiciones",
+            # Resolución DIAN
+            "numero_resolucion_factura",
+            "rango_inicial_factura",
+            "rango_final_factura",
+            "fecha_inicio_resolucion",
+            "fecha_fin_resolucion",
+            # Plantillas
+            "plantilla_factura_pdf",
+            "plantilla_correo_factura",
+            # Contabilidad
+            "cuenta_ventas",
+            "cuenta_impuestos",
+            "cuenta_cxc_clientes",
         ]
 
     # ── Validaciones de campos individuales ───────────────────────────────────

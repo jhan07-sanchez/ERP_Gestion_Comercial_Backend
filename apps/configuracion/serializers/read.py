@@ -15,8 +15,26 @@ Autor: Sistema ERP
 """
 
 from rest_framework import serializers
-from apps.configuracion.models import ConfiguracionGeneral
+from apps.configuracion.models import ConfiguracionGeneral, Impuesto, MetodoPago, CondicionPago
+from apps.configuracion.services.configuracion_service import ConfiguracionService
 
+
+class ImpuestoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Impuesto
+        fields = ["id", "nombre", "porcentaje", "activo"]
+
+class MetodoPagoSerializer(serializers.ModelSerializer):
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+    class Meta:
+        model = MetodoPago
+        fields = ["id", "nombre", "activo", "es_efectivo", "tipo", "tipo_display"]
+
+class CondicionPagoSerializer(serializers.ModelSerializer):
+    es_contado = serializers.BooleanField(read_only=True)
+    class Meta:
+        model = CondicionPago
+        fields = ["id", "nombre", "dias_plazo", "activo", "es_contado"]
 
 class ConfiguracionReadSerializer(serializers.ModelSerializer):
     """
@@ -51,6 +69,11 @@ class ConfiguracionReadSerializer(serializers.ModelSerializer):
     numero_factura_preview = serializers.SerializerMethodField()
     numero_compra_preview = serializers.SerializerMethodField()
     numero_recibo_preview = serializers.SerializerMethodField()
+
+    # Master payload fields
+    impuestos_activos = serializers.SerializerMethodField()
+    metodos_pago_activos = serializers.SerializerMethodField()
+    condiciones_pago_activas = serializers.SerializerMethodField()
 
     class Meta:
         model = ConfiguracionGeneral
@@ -99,6 +122,23 @@ class ConfiguracionReadSerializer(serializers.ModelSerializer):
             "descuento_maximo",
             "permitir_venta_sin_stock",
             "terminos_condiciones",
+            # Resolución DIAN
+            "numero_resolucion_factura",
+            "rango_inicial_factura",
+            "rango_final_factura",
+            "fecha_inicio_resolucion",
+            "fecha_fin_resolucion",
+            # Plantillas
+            "plantilla_factura_pdf",
+            "plantilla_correo_factura",
+            # Contabilidad
+            "cuenta_ventas",
+            "cuenta_impuestos",
+            "cuenta_cxc_clientes",
+            # Master Payload
+            "impuestos_activos",
+            "metodos_pago_activos",
+            "condiciones_pago_activas",
             # Metadata
             "fecha_creacion",
             "fecha_actualizacion",
@@ -136,6 +176,15 @@ class ConfiguracionReadSerializer(serializers.ModelSerializer):
     def get_numero_recibo_preview(self, obj):
         """Vista previa del próximo número de recibo."""
         return f"{obj.prefijo_recibo}-{str(obj.consecutivo_recibo).zfill(obj.digitos_consecutivo)}"
+
+    def get_impuestos_activos(self, obj):
+        return ImpuestoSerializer(ConfiguracionService.obtener_impuestos_activos(), many=True).data
+
+    def get_metodos_pago_activos(self, obj):
+        return MetodoPagoSerializer(ConfiguracionService.obtener_metodos_pago_activos(), many=True).data
+
+    def get_condiciones_pago_activas(self, obj):
+        return CondicionPagoSerializer(ConfiguracionService.obtener_condiciones_pago_activas(), many=True).data
 
 
 class ConfiguracionResumenSerializer(serializers.ModelSerializer):

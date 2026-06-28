@@ -242,6 +242,42 @@ class ConfiguracionGeneral(models.Model):
         help_text="Cantidad de dígitos para rellenar con ceros (ej: 4 → 0001, 6 → 000001)",
     )
 
+    # ── Resolución DIAN ────────────────────────────────────────────────────────
+    numero_resolucion_factura = models.CharField(
+        max_length=50, blank=True, null=True, verbose_name="Número de resolución DIAN"
+    )
+    rango_inicial_factura = models.PositiveIntegerField(
+        default=1, verbose_name="Rango inicial autorizado"
+    )
+    rango_final_factura = models.PositiveIntegerField(
+        default=10000, verbose_name="Rango final autorizado"
+    )
+    fecha_inicio_resolucion = models.DateField(
+        blank=True, null=True, verbose_name="Fecha inicio resolución"
+    )
+    fecha_fin_resolucion = models.DateField(
+        blank=True, null=True, verbose_name="Fecha fin resolución"
+    )
+
+    # ── Plantillas y Correo ───────────────────────────────────────────────────
+    plantilla_factura_pdf = models.CharField(
+        max_length=50, default="estandar", verbose_name="Plantilla PDF Factura"
+    )
+    plantilla_correo_factura = models.TextField(
+        blank=True, default="", verbose_name="Plantilla Correo Factura"
+    )
+
+    # ── Contabilidad ──────────────────────────────────────────────────────────
+    cuenta_ventas = models.CharField(
+        max_length=50, blank=True, default="", verbose_name="Cuenta Contable Ventas"
+    )
+    cuenta_impuestos = models.CharField(
+        max_length=50, blank=True, default="", verbose_name="Cuenta Contable Impuestos"
+    )
+    cuenta_cxc_clientes = models.CharField(
+        max_length=50, blank=True, default="", verbose_name="Cuenta Contable CxC Clientes"
+    )
+
     # ── Configuración de Inventario y Alertas ─────────────────────────────────
 
     stock_minimo_global = models.PositiveIntegerField(
@@ -418,3 +454,92 @@ class ConfiguracionGeneral(models.Model):
             "regimen_fiscal": self.get_regimen_fiscal_display(),
             "terminos": self.terminos_condiciones,
         }
+
+# ============================================================================
+# MODELOS DE CATÁLOGO GLOBAL (Impuestos, Métodos de Pago, Condiciones)
+# ============================================================================
+
+class Impuesto(models.Model):
+    nombre = models.CharField(max_length=50, unique=True, help_text="Ej: IVA 19%, ReteFuente 2.5%")
+    porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "configuracion_impuesto"
+        verbose_name = "Impuesto"
+        verbose_name_plural = "Impuestos"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.porcentaje}%)"
+
+
+class MetodoPago(models.Model):
+    TIPO_CONTADO = "CONTADO"
+    TIPO_CREDITO = "CREDITO"
+
+    TIPO_CHOICES = [
+        (TIPO_CONTADO, "Contado"),
+        (TIPO_CREDITO, "Crédito"),
+    ]
+
+    nombre = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Nombre del método de pago (ej: Efectivo, Tarjeta)",
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="Si está activo, aparece como opción al registrar movimientos",
+    )
+    es_efectivo = models.BooleanField(
+        default=False,
+        help_text="Marcar si este método cuenta como dinero en efectivo físico",
+    )
+    tipo = models.CharField(
+        max_length=10,
+        choices=TIPO_CHOICES,
+        default=TIPO_CONTADO,
+        help_text=(
+            "CONTADO: requiere saldo en caja y genera egreso inmediato. "
+            "CREDITO: no afecta caja y genera una Cuenta por Pagar."
+        ),
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "configuracion_metodo_pago"
+        verbose_name = "Método de Pago"
+        verbose_name_plural = "Métodos de Pago"
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.get_tipo_display()})"
+
+    @property
+    def es_contado(self) -> bool:
+        return self.tipo == self.TIPO_CONTADO
+
+    @property
+    def es_credito(self) -> bool:
+        return self.tipo == self.TIPO_CREDITO
+
+
+class CondicionPago(models.Model):
+    nombre = models.CharField(max_length=50, unique=True, help_text="Ej: Contado, Crédito 30 días")
+    dias_plazo = models.PositiveIntegerField(
+        default=0, help_text="Días de plazo para el pago. 0 para pago de contado."
+    )
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "configuracion_condicion_pago"
+        verbose_name = "Condición de Pago"
+        verbose_name_plural = "Condiciones de Pago"
+        ordering = ["dias_plazo", "nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+    @property
+    def es_contado(self) -> bool:
+        return self.dias_plazo == 0

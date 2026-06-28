@@ -1,14 +1,6 @@
 # apps/caja/admin.py
 from django.contrib import admin
-from .models import MetodoPago, Caja, SesionCaja, MovimientoCaja, ArqueoCaja
-
-
-@admin.register(MetodoPago)
-class MetodoPagoAdmin(admin.ModelAdmin):
-    list_display = ("id", "nombre", "es_efectivo", "activo", "fecha_creacion")
-    list_editable = ("activo",)
-    list_filter = ("activo", "es_efectivo")
-    search_fields = ("nombre",)
+from .models import Caja, SesionCaja, MovimientoCaja, ArqueoCaja
 
 
 @admin.register(Caja)

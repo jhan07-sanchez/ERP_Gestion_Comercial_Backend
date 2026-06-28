@@ -38,73 +38,9 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 from decimal import Decimal
+from apps.configuracion.models import MetodoPago
 
 
-# ============================================================================
-# MÉTODO DE PAGO
-# ============================================================================
-
-
-class MetodoPago(models.Model):
-    """
-    Métodos de pago disponibles en caja.
-
-    Ejemplos:
-    - Efectivo
-    - Tarjeta débito
-    - Tarjeta crédito
-    - Transferencia bancaria
-    - Nequi / Daviplata
-    """
-
-    TIPO_CONTADO = "CONTADO"
-    TIPO_CREDITO = "CREDITO"
-
-    TIPO_CHOICES = [
-        (TIPO_CONTADO, "Contado"),
-        (TIPO_CREDITO, "Crédito"),
-    ]
-
-    nombre = models.CharField(
-        max_length=50,
-        unique=True,
-        help_text="Nombre del método de pago (ej: Efectivo, Tarjeta)",
-    )
-    activo = models.BooleanField(
-        default=True,
-        help_text="Si está activo, aparece como opción al registrar movimientos",
-    )
-    es_efectivo = models.BooleanField(
-        default=False,
-        help_text="Marcar si este método cuenta como dinero en efectivo físico",
-    )
-    #NUEVO CAMPO: tipo de pago (Contado vs Crédito)
-    tipo = models.CharField(
-        max_length=10,
-        choices=TIPO_CHOICES,
-        default=TIPO_CONTADO,
-        help_text=(
-            "CONTADO: requiere saldo en caja y genera egreso inmediato. "
-            "CREDITO: no afecta caja y genera una Cuenta por Pagar al proveedor."
-        ),
-    )
-    fecha_creacion = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "Método de Pago"
-        verbose_name_plural = "Métodos de Pago"
-        ordering = ["nombre"]
-
-    def __str__(self):
-        return f"{self.nombre} ({self.get_tipo_display()})"
-
-    @property
-    def es_contado(self) -> bool:
-        return self.tipo == self.TIPO_CONTADO
-
-    @property
-    def es_credito(self) -> bool:
-        return self.tipo == self.TIPO_CREDITO
 
 
 # ============================================================================

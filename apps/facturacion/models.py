@@ -4,20 +4,7 @@ from decimal import Decimal
 from apps.documentos.models import Documento
 from apps.clientes.models import Cliente
 from apps.productos.models import Producto
-from apps.caja.models import MetodoPago
-
-class Impuesto(models.Model):
-    nombre = models.CharField(max_length=50, unique=True, help_text="Ej: IVA 19%, ReteFuente 2.5%")
-    porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
-    activo = models.BooleanField(default=True)
-
-    class Meta:
-        db_table = "facturacion_impuesto"
-        verbose_name = "Impuesto"
-        verbose_name_plural = "Impuestos"
-
-    def __str__(self):
-        return f"{self.nombre} ({self.porcentaje}%)"
+from apps.configuracion.models import MetodoPago, Impuesto, CondicionPago
 
 
 class Factura(models.Model):
@@ -42,6 +29,10 @@ class Factura(models.Model):
 
     fecha_emision = models.DateTimeField(null=True, blank=True)
     fecha_vencimiento = models.DateField(null=True, blank=True)
+    
+    # Condiciones de Pago (Desde Configuración Global)
+    condicion_pago = models.ForeignKey(CondicionPago, on_delete=models.PROTECT, null=True, blank=True)
+
     
     # Totales
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -227,20 +218,4 @@ class NotaDebitoDetalle(models.Model):
     def __str__(self):
         return self.producto_nombre
 
-class ResolucionFacturacion(models.Model):
-    prefijo = models.CharField(max_length=10, blank=True, null=True)
-    numero_resolucion = models.CharField(max_length=50, unique=True)
-    rango_inicial = models.IntegerField()
-    rango_final = models.IntegerField()
-    consecutivo_actual = models.IntegerField()
-    fecha_inicio = models.DateField()
-    fecha_fin = models.DateField()
-    activa = models.BooleanField(default=True)
-    
-    class Meta:
-        db_table = "facturacion_resolucion"
-        verbose_name = "Resolución de Facturación"
-        verbose_name_plural = "Resoluciones de Facturación"
-        
-    def __str__(self):
-        return f"{self.numero_resolucion} ({self.prefijo})"
+

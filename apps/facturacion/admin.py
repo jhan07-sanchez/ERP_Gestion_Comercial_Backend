@@ -1,6 +1,5 @@
 from django.contrib import admin
 from .models import (
-    Impuesto,
     Factura,
     FacturaDetalle,
     FacturaImpuesto,
@@ -11,12 +10,6 @@ from .models import (
     NotaDebito,
     NotaDebitoDetalle
 )
-
-@admin.register(Impuesto)
-class ImpuestoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'porcentaje', 'activo')
-    list_filter = ('activo',)
-    search_fields = ('nombre',)
 
 
 class FacturaDetalleInline(admin.TabularInline):

@@ -16,7 +16,12 @@ Autor: Sistema ERP
 """
 
 from django.contrib import admin
-from apps.configuracion.models import ConfiguracionGeneral
+from apps.configuracion.models import (
+    ConfiguracionGeneral,
+    Impuesto,
+    MetodoPago,
+    CondicionPago
+)
 
 
 @admin.register(ConfiguracionGeneral)
@@ -97,6 +102,37 @@ class ConfiguracionGeneralAdmin(admin.ModelAdmin):
                 ),
             },
         ),
+        (
+            "📄 Resolución DIAN",
+            {
+                "fields": (
+                    "numero_resolucion_factura",
+                    "rango_inicial_factura",
+                    "rango_final_factura",
+                    "fecha_inicio_resolucion",
+                    "fecha_fin_resolucion",
+                ),
+            },
+        ),
+        (
+            "🎨 Plantillas",
+            {
+                "fields": (
+                    "plantilla_factura_pdf",
+                    "plantilla_correo_factura",
+                ),
+            },
+        ),
+        (
+            "📊 Cuentas Contables",
+            {
+                "fields": (
+                    "cuenta_ventas",
+                    "cuenta_impuestos",
+                    "cuenta_cxc_clientes",
+                ),
+            },
+        ),
         # ── Sección 4: Inventario ───────────────────────────────────────────
         (
             "📦 Configuración de Inventario",
@@ -149,3 +185,19 @@ class ConfiguracionGeneralAdmin(admin.ModelAdmin):
         Mejor no permitirlo desde el admin.
         """
         return False
+
+
+@admin.register(Impuesto)
+class ImpuestoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "porcentaje", "activo")
+    list_editable = ("activo",)
+
+@admin.register(MetodoPago)
+class MetodoPagoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "tipo", "es_efectivo", "activo")
+    list_editable = ("activo",)
+
+@admin.register(CondicionPago)
+class CondicionPagoAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "dias_plazo", "activo")
+    list_editable = ("activo",)

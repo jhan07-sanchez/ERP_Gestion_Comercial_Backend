@@ -21,7 +21,7 @@ Autor: Sistema ERP
 from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.cache import cache
-from apps.configuracion.models import ConfiguracionGeneral
+from apps.configuracion.models import ConfiguracionGeneral, Impuesto, MetodoPago, CondicionPago
 
 CACHE_KEY = "global_config_singleton"
 CACHE_TIMEOUT = 3600 * 24  # 24 horas
@@ -124,3 +124,15 @@ class ConfiguracionService:
         numero = config.generar_numero_recibo()
         ConfiguracionService.limpiar_cache()
         return numero
+
+    @staticmethod
+    def obtener_impuestos_activos():
+        return Impuesto.objects.filter(activo=True)
+
+    @staticmethod
+    def obtener_metodos_pago_activos():
+        return MetodoPago.objects.filter(activo=True)
+
+    @staticmethod
+    def obtener_condiciones_pago_activas():
+        return CondicionPago.objects.filter(activo=True)
